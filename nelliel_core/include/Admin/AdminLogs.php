@@ -8,14 +8,15 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminLogs extends Admin
 {
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
@@ -28,29 +29,57 @@ class AdminLogs extends Admin
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
+        $this->verifyAction();
     }
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
     {
+        $this->verifyAction();
     }
 
     public function remove()
     {
+        $this->verifyAction();
     }
 
-    private function verifyAccess()
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_logs'))
         {
-            nel_derp(341, _gettext('You are not allowed to access the logs panel.'));
+            nel_derp(470, _gettext('You do not have access to the Logs panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_logs'))
+        {
+            nel_derp(471, _gettext('You are not allowed to manage logs.'));
         }
     }
 }

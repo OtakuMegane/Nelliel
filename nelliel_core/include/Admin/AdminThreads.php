@@ -7,6 +7,7 @@ if (!defined('NELLIEL_VERSION'))
     die("NOPE.AVI");
 }
 
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 use Nelliel\Content\ContentID;
 use Nelliel\Domains\Domain;
@@ -16,14 +17,16 @@ class AdminThreads extends Admin
 {
     private $site_domain;
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
         $this->site_domain = new DomainSite($this->database);
     }
 
     public function renderPanel()
     {
+        $this->verifyAccess();
+
         if (isset($_GET['actions']) && $_GET['actions'] === 'expand-thread')
         {
             $content_id = new ContentID($_GET['content-id']);
@@ -39,14 +42,17 @@ class AdminThreads extends Admin
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
+        $this->verifyAction();
     }
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
@@ -62,13 +68,24 @@ class AdminThreads extends Admin
         $this->regenThread($content_id->threadID(), true);
     }
 
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
     public function sticky()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_board_sticky_posts'))
-        {
-            nel_derp(351, _gettext('You are not allowed to sticky threads.'));
-        }
-
+        $this->verifyAction();
         $content_id = new ContentID($_GET['content-id']);
 
         if ($content_id->isThread() || $content_id->isPost())
@@ -78,29 +95,9 @@ class AdminThreads extends Admin
         }
     }
 
-    public function unsticky()
-    {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_board_sticky_posts'))
-        {
-            nel_derp(352, _gettext('You are not allowed to unsticky threads.'));
-        }
-
-        $content_id = new ContentID($_GET['content-id']);
-
-        if ($content_id->isThread() || $content_id->isPost())
-        {
-            $content_id->getInstanceFromID($this->domain)->unsticky();
-            $this->regenThread($content_id->threadID(), true);
-        }
-    }
-
     public function lock()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_board_lock_posts'))
-        {
-            nel_derp(353, _gettext('You are not allowed to lock threads.'));
-        }
-
+        $this->verifyAction();
         $content_id = new ContentID($_GET['content-id']);
 
         if ($content_id->isThread())
@@ -110,18 +107,26 @@ class AdminThreads extends Admin
         }
     }
 
-    public function unlock()
+    public function permasage()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_board_lock_posts'))
-        {
-            nel_derp(354, _gettext('You are not allowed to unlock threads.'));
-        }
-
+        $this->verifyAction();
         $content_id = new ContentID($_GET['content-id']);
 
         if ($content_id->isThread())
         {
-            $content_id->getInstanceFromID($this->domain)->lock();
+            $content_id->getInstanceFromID($this->domain)->sage();
+            $this->regenThread($content_id->threadID(), true);
+        }
+    }
+
+    public function cyclic()
+    {
+        $this->verifyAction();
+        $content_id = new ContentID($_GET['content-id']);
+
+        if ($content_id->isThread())
+        {
+            $content_id->getInstanceFromID($this->domain)->cyclic();
             $this->regenThread($content_id->threadID(), true);
         }
     }
@@ -147,19 +152,27 @@ class AdminThreads extends Admin
         $content_id = new ContentID($_GET['content-id']);
         $content_instance = $content_id->getInstanceFromID($this->domain);
         $content_instance->loadFromDatabase();
-        $ip_start = $content_instance->data('ip_address');
-        $hashed_ip = $content_instance->data('hashed_ip_address');
-        $ban_type = 'CONTENT';
         $content_instance->remove();
         $this->regenThread($content_id->threadID(), true);
+        $ban_ip = $_GET['ban-ip'] ?? '';
         $output_panel = new \Nelliel\Render\OutputPanelBans($this->domain, false);
-        $output_panel->render(
-                ['section' => 'add', 'ip_start' => $ip_start, 'hashed_ip' => $hashed_ip, 'ban_type' => $ban_type],
-                false);
+        $output_panel->new(['ban_ip' => $ban_ip], false);
         $this->outputMain(false);
     }
 
-    private function verifyAccess()
+    public function verifyAccess()
     {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_threads'))
+        {
+            nel_derp(460, _gettext('You do not have access to the Threads panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_threads'))
+        {
+            nel_derp(461, _gettext('You are not allowed to manage threads or posts.'));
+        }
     }
 }

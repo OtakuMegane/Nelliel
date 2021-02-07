@@ -13,7 +13,6 @@ use PDO;
 
 class OutputPanelReports extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -22,9 +21,8 @@ class OutputPanelReports extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/reports');
         $parameters['is_panel'] = true;
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Reports');
@@ -69,7 +67,7 @@ class OutputPanelReports extends Output
                 $content_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'render', 'actions' => 'view-thread', 'thread' => $content_id->threadID(),
-                                    'content-id' => $content_id->getIDString(), 'board_id' => $report_info['board_id'],
+                                    'content-id' => $content_id->getIDString(), 'board-id' => $report_info['board_id'],
                                     'modmode' => 'true']);
                 $report_data['is_content'] = false;
             }
@@ -78,7 +76,7 @@ class OutputPanelReports extends Output
                 $content_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'render', 'actions' => 'view-thread', 'thread' => $content_id->threadID(),
-                                    'content-id' => $content_id->getIDString(), 'board_id' => $report_info['board_id'],
+                                    'content-id' => $content_id->getIDString(), 'board-id' => $report_info['board_id'],
                                     'modmode' => 'true']);
                 $content_url .= '#t' . $content_id->threadID() . 'p' . $content_id->postID();
                 $report_data['is_content'] = false;
@@ -97,7 +95,7 @@ class OutputPanelReports extends Output
                 $content_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'render', 'actions' => 'view-thread', 'thread' => $content_id->threadID(),
-                                    'content-id' => $content_id->getIDString(), 'board_id' => $report_info['board_id'],
+                                    'content-id' => $content_id->getIDString(), 'board-id' => $report_info['board_id'],
                                     'modmode' => 'true']);
                 $content_url .= '#t' . $content_id->threadID() . 'p' . $content_id->postID();
             }
@@ -109,7 +107,7 @@ class OutputPanelReports extends Output
             $report_data['reason'] = $report_info['reason'];
             $report_data['reporter_ip'] = @inet_pton($report_info['reporter_ip']);
             $report_data['dismiss_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH . 'module=admin&section=reports&board-id=' .
-                    $report_info['board_id'] . '&actions=remove&report_id=' . $report_info['report_id'];
+                    $report_info['board-id'] . '&actions=remove&report_id=' . $report_info['report_id'];
             $this->render_data['reports_list'][] = $report_data;
         }
 

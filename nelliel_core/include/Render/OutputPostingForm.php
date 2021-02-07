@@ -11,7 +11,6 @@ use Nelliel\Domains\Domain;
 
 class OutputPostingForm extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -20,33 +19,50 @@ class OutputPostingForm extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $session = new \Nelliel\Account\Session();
+        $this->renderSetup();
         $response_to = $parameters['response_to'];
+        $this->render_data['allow_embeds'] = true; // TODO: Change this when we get a setting
         $this->render_data['response_to'] = $response_to;
         $this->render_data['form_action'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH . 'module=threads&actions=new-post&board-id=' .
                 $this->domain->id();
-        $this->render_data['in_modmode'] = $session->inModmode($this->domain) && !$this->write_mode;
-        $this->render_data['is_staff'] = $session->inModmode($this->domain) && !$this->write_mode;
+        $this->render_data['in_modmode'] = $this->session->inModmode($this->domain) && !$this->write_mode;
+        $this->render_data['is_staff'] = $this->session->inModmode($this->domain) && !$this->write_mode;
         $this->render_data['not_anonymous_maxlength'] = $this->domain->setting('max_name_length');
         $this->render_data['spam_target_maxlength'] = $this->domain->setting('max_email_length');
         $this->render_data['verb_maxlength'] = $this->domain->setting('max_subject_length');
         $this->render_data['forced_anonymous'] = $this->domain->setting('forced_anonymous');
-        $uploads_data = array();
-        $uploads_data['allow_multiple'] = false;
 
-        if ($response_to)
+        if (!$response_to)
         {
-            $uploads_data['allow_multiple'] = $this->domain->setting('allow_multifile');
+            $this->render_data['allow_files'] = $this->domain->setting('allow_files') &&
+                    $this->domain->setting('allow_op_uploads');
+            $this->render_data['allow_embeds'] = $this->domain->setting('allow_embeds') &&
+                    $this->domain->setting('allow_op_uploads');
+            $this->render_data['allow_multiple'] = $this->domain->setting('allow_op_multiple');
         }
         else
         {
-            $uploads_data['allow_multiple'] = $this->domain->setting('allow_op_multifile');
+            $this->render_data['allow_files'] = $this->domain->setting('allow_files') &&
+                    $this->domain->setting('allow_reply_uploads');
+            $this->render_data['allow_embeds'] = $this->domain->setting('allow_embeds') &&
+                    $this->domain->setting('allow_reply_uploads');
+            $this->render_data['allow_multiple'] = $this->domain->setting('allow_reply_multiple');
         }
 
-        $uploads_data['spoilers_enabled'] = $this->domain->setting('enable_spoilers');
-        $this->render_data['file_uploads'] = $uploads_data;
+        if ($this->domain->setting('allow_op_multiple') || $this->domain->setting('allow_reply_multiple'))
+        {
+            $max_files = $this->domain->setting('max_post_uploads');
+        }
+        else
+        {
+            $max_files = 1;
+        }
 
+        $this->render_data['file_max_message'] = sprintf(_gettext('Maximum files: %d'), $max_files);
+        $this->render_data['file_required'] = ($response_to) ? $this->domain->setting('require_reply_upload') : $this->domain->setting(
+                'require_op_upload');
+        $this->render_data['embed_replaces'] = $this->domain->setting('embed_replaces_file');
+        $this->render_data['spoilers_enabled'] = $this->domain->setting('enable_spoilers');
         $this->render_data['use_fgsfds'] = $this->domain->setting('use_fgsfds');
         $this->render_data['fgsfds_name'] = $this->domain->setting('fgsfds_name');
         $this->render_data['use_post_captcha'] = $this->domain->setting('use_post_captcha');
@@ -60,8 +76,7 @@ class OutputPostingForm extends Output
         $this->render_data['honeypot_field_name1'] = NEL_BASE_HONEYPOT_FIELD1 . '_' . $this->domain->id();
         $this->render_data['honeypot_field_name2'] = NEL_BASE_HONEYPOT_FIELD2 . '_' . $this->domain->id();
         $this->render_data['honeypot_field_name3'] = NEL_BASE_HONEYPOT_FIELD3 . '_' . $this->domain->id();
-        $this->render_data['posting_mode'] = ($response_to) ? _gettext('Posting mode: Reply') : _gettext(
-                'Posting mode: New thread');
+        $this->render_data['posting_submit'] = ($response_to) ? _gettext('Reply') : _gettext('New thread');
         $this->postingRules();
         $output = $this->output('thread/posting_form', $data_only, true, $this->render_data);
         return $output;
@@ -93,7 +108,7 @@ class OutputPostingForm extends Output
         $this->render_data['posting_rules_items'][]['rules_text'] = sprintf(
                 _gettext('Maximum file size allowed is %dKB'), $this->domain->setting('max_filesize'));
         $this->render_data['posting_rules_items'][]['rules_text'] = sprintf(
-                _gettext('Images greater than %d x %d pixels will be thumbnailed.'), $this->domain->setting('max_width'),
-                $this->domain->setting('max_height'));
+                _gettext('Images greater than %d x %d pixels will be thumbnailed.'),
+                $this->domain->setting('max_preview_width'), $this->domain->setting('max_preview_height'));
     }
 }

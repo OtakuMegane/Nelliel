@@ -7,26 +7,31 @@ if (!defined('NELLIEL_VERSION'))
     die("NOPE.AVI");
 }
 
+use Nelliel\Cites;
 use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
+use Nelliel\Content\ContentPost;
 use Nelliel\Domains\Domain;
 
 class PostData
 {
     private $domain;
     private $authorization;
+    private $session;
 
-    function __construct(Domain $domain, Authorization $authorization)
+    function __construct(Domain $domain, Authorization $authorization, Session $session)
     {
         $this->domain = $domain;
         $this->authorization = $authorization;
+        $this->session = $session;
     }
 
-    public function processPostData($post)
+    public function processPostData(ContentPost $post)
     {
         if (!isset($_POST['new_post']))
         {
-            die("no new post data?");
+            nel_derp(35,
+                    "No POST data was received. The request may have been too big or server settings need to be adjusted.");
         }
 
         $post->changeData('parent_thread', $this->checkEntry($_POST['new_post']['post_info']['response_to'], 'integer'));
@@ -50,14 +55,31 @@ class PostData
 
         if (!$post->data('post_as_staff'))
         {
-            $session = new Session();
-            $session->ignore(true);
+            $this->session->ignore(true);
         }
+
+        $response_to = $post->data('response_to') > 0;
+
+        if (!$response_to)
+        {
+            if (nel_true_empty($post->data('comment')) && $this->domain->setting('require_op_comment'))
+            {
+                nel_derp(41, _gettext('A comment is required when starting a thread.'));
+            }
+        }
+        else
+        {
+            if (nel_true_empty($post->data('comment')) && $this->domain->setting('require_reply_comment'))
+            {
+                nel_derp(42, _gettext('A comment is required when replying.'));
+            }
+        }
+
+        $this->staffPost($post);
 
         if ($post->data('poster_name') !== '')
         {
             $this->tripcodes($post);
-            $this->staffPost($post);
         }
         else
         {
@@ -70,7 +92,25 @@ class PostData
             $post->changeData('email', '');
         }
 
-        $post = nel_plugins()->processHook('nel-post-data-processed', [$this->domain], $post);
+        if(!nel_true_empty($post->data('comment')))
+        {
+            $cites = new Cites($this->domain->database());
+            $cite_list = $cites->getCitesFromText($post->data('comment'), false);
+
+            if (count($cite_list['board']) > $this->domain->setting('max_cites'))
+            {
+                nel_derp(44,
+                        sprintf(_gettext('Comment contains too many cites. Maximum is %d.'),
+                                $this->domain->setting('max_cites')));
+            }
+
+            if (count($cite_list['crossboard']) > $this->domain->setting('max_crossboard_cites'))
+            {
+                nel_derp(45,
+                        sprintf(_gettext('Comment contains too many cross-board cites. Maximum is %d.'),
+                                $this->domain->setting('max_crossboard_cites')));
+            }
+        }
     }
 
     public function checkEntry($post_item, $type)
@@ -102,14 +142,14 @@ class PostData
             return;
         }
 
-        $session = new \Nelliel\Account\Session();
+        $this->session->init(true);
 
-        if (!$session->isActive())
+        if (!$this->session->isActive())
         {
             return;
         }
 
-        $user = $session->sessionUser();
+        $user = $this->session->user();
 
         if (!$user->checkPermission($this->domain, 'perm_board_post_as_staff'))
         {
@@ -135,7 +175,7 @@ class PostData
         $post->changeData('tripcode', '');
         $post->changeData('secure_tripcode', '');
 
-        if ($name_pieces[2] !== '' && $this->domain->setting('allow_tripkeys'))
+        if ($name_pieces[2] !== '' && $this->domain->setting('allow_tripcodes'))
         {
             $trip = $this->tripcodeCharsetConvert($name_pieces[2], 'SHIFT_JIS', 'UTF-8');
             $salt = substr($trip . 'H.', 1, 2);
@@ -144,7 +184,7 @@ class PostData
             $post->changeData('tripcode', substr(crypt($trip, $salt), -10));
         }
 
-        if ($name_pieces[3] !== '' && $this->domain->setting('allow_tripkeys'))
+        if ($name_pieces[3] !== '' && $this->domain->setting('allow_tripcodes'))
         {
             $trip = $name_pieces[3];
             $trip = hash($site_domain->setting('secure_tripcode_algorithm'), $trip . NEL_TRIPCODE_PEPPER);

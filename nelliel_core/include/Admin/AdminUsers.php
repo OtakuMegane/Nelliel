@@ -7,6 +7,7 @@ if (!defined('NELLIEL_VERSION'))
     die("NOPE.AVI");
 }
 
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 use Nelliel\Domains\Domain;
 use Nelliel\Domains\DomainBoard;
@@ -17,9 +18,9 @@ class AdminUsers extends Admin
 {
     private $user_id;
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
         $this->user_id = $_GET['user-id'] ?? null;
 
         if (!is_null($this->user_id) && !$this->authorization->userExists($this->user_id))
@@ -45,11 +46,7 @@ class AdminUsers extends Admin
 
     public function add()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_users'))
-        {
-            nel_derp(301, _gettext('You are not allowed to add users.'));
-        }
-
+        $this->verifyAction();
         $this->user_id = $_POST['user_id'];
         $this->update();
         $this->outputMain(true);
@@ -65,11 +62,7 @@ class AdminUsers extends Admin
 
     public function update()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_users'))
-        {
-            nel_derp(302, _gettext('You are not allowed to modify users.'));
-        }
-
+        $this->verifyAction();
         $update_user = $this->authorization->getUser($this->user_id);
 
         if ($update_user->empty())
@@ -119,20 +112,39 @@ class AdminUsers extends Admin
 
     public function remove()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_users'))
-        {
-            nel_derp(303, _gettext('You are not allowed to remove users.'));
-        }
-
+        $this->verifyAction();
         $this->authorization->removeUser($this->user_id);
         $this->outputMain(true);
     }
 
-    private function verifyAccess()
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_users'))
         {
-            nel_derp(300, _gettext('You are not allowed to access the users panel.'));
+            nel_derp(300, _gettext('You do not have access to the Users panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_users'))
+        {
+            nel_derp(301, _gettext('You are not allowed to manage users.'));
         }
     }
 }

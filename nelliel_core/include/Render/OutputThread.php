@@ -13,7 +13,6 @@ use PDO;
 
 class OutputThread extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -22,11 +21,9 @@ class OutputThread extends Output
 
     public function render(array $parameters = array(), bool $data_only = false)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('thread/thread');
-        $session = new \Nelliel\Account\Session();
         $thread_id = ($parameters['thread_id']) ?? 0;
         $command = ($parameters['command']) ?? 'view-thread';
         $thread_content_id = ContentID::createIDString($thread_id);
@@ -51,35 +48,28 @@ class OutputThread extends Output
             return;
         }
 
+        $thread_format = sprintf($this->site_domain->setting('thread_filename_format'), $thread_id);
         $output_head = new OutputHead($this->domain, $this->write_mode);
         $this->render_data['head'] = $output_head->render([], true);
         $output_header = new OutputHeader($this->domain, $this->write_mode);
 
-        if ($session->inModmode($this->domain) && !$this->write_mode)
-        {
-            $return_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
-            http_build_query(
-                    ['module' => 'render', 'actions' => 'view-index', 'index' => '0',
-                    'board-id' => $this->domain->id(), 'modmode' => 'true']);
-        }
-        else
-        {
-            $return_url = $this->domain->reference('board_web_path') . NEL_MAIN_INDEX . NEL_PAGE_EXT;
-        }
-
-        $this->render_data['return_url'] = $return_url;
-
-        if ($session->isActive() && !$this->write_mode)
+        if ($this->session->inModmode($this->domain) && !$this->write_mode)
         {
             $manage_headers['header'] = _gettext('Moderator Mode');
             $manage_headers['sub_header'] = _gettext('View Thread');
             $this->render_data['header'] = $output_header->board(['manage_headers' => $manage_headers], true);
+            $return_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
+                    http_build_query(
+                            ['module' => 'render', 'actions' => 'view-index', 'index' => '0',
+                                'board-id' => $this->domain->id(), 'modmode' => 'true']);
         }
         else
         {
             $this->render_data['header'] = $output_header->board([], true);
+            $return_url = $this->domain->reference('board_web_path') . NEL_MAIN_INDEX . NEL_PAGE_EXT;
         }
 
+        $this->render_data['return_url'] = $return_url;
         $json_thread = new \Nelliel\API\JSON\JSONThread($this->domain, $this->file_handler);
         $json_thread->storeData($json_thread->prepareData($thread_data), 'thread');
         $json_content = new \Nelliel\API\JSON\JSONContent($this->domain, $this->file_handler);
@@ -136,10 +126,9 @@ class OutputThread extends Output
         if ($this->write_mode)
         {
             $this->file_handler->writeFile(
-                    $this->domain->reference('page_path') . $thread_id . '/thread-' . $thread_id . '.html', $output,
+                    $this->domain->reference('page_path') . $thread_id . '/' . $thread_format . NEL_PAGE_EXT, $output,
                     NEL_FILES_PERM, true);
-            $json_thread->writeStoredData($this->domain->reference('page_path') . $thread_id . '/',
-                    sprintf('thread-%d', $thread_id));
+            $json_thread->writeStoredData($this->domain->reference('page_path') . $thread_id . '/', $thread_format);
         }
         else
         {

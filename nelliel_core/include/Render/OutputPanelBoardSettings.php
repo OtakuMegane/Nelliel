@@ -12,7 +12,6 @@ use PDO;
 
 class OutputPanelBoardSettings extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -21,9 +20,8 @@ class OutputPanelBoardSettings extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/board_settings');
         $parameters['is_panel'] = true;
         $parameters['section'] = $parameters['section'] ?? _gettext('Edit');
@@ -51,7 +49,8 @@ class OutputPanelBoardSettings extends Output
         }
 
         $this->render_data['header'] = $output_header->manage($parameters, true);
-        $user_lock_override = $this->session->sessionUser()->checkPermission($this->domain, 'perm_board_config_lock_override');
+        $user_lock_override = $this->session->user()->checkPermission($this->domain,
+                'perm_manage_board_config_override');
         $all_filetypes = $filetypes->allTypeData();
         $all_types = $filetypes->types();
         $prepared = $this->database->prepare(
@@ -64,7 +63,7 @@ class OutputPanelBoardSettings extends Output
         foreach ($all_types as $type)
         {
             $type_data = array();
-            $type_data['label'] = _gettext($type['label']);
+            $type_data['type_label'] = _gettext($type['type_label']);
             $type_data['type_select']['name'] = $type['type'];
             $type_data['type_select']['input_name'] = 'enabled_filetypes[types][' . $type['type'] . '][enabled]';
 
@@ -92,21 +91,21 @@ class OutputPanelBoardSettings extends Output
                 $filetype_set[$filetype['base_extension']]['format'] = $filetype['format'];
                 $filetype_set[$filetype['base_extension']]['input_name'] = 'enabled_filetypes[types][' . $type['type'] .
                         '][formats][' . $filetype['format'] . ']';
-                $filetype_set[$filetype['base_extension']]['label'] = _gettext($filetype['label']);
+                $filetype_set[$filetype['base_extension']]['type_label'] = _gettext($filetype['type_label']);
                 $filetype_set[$filetype['base_extension']]['value'] = (array_key_exists($filetype['format'],
                         $enabled_formats)) ? 'checked' : '';
                 $filetype_set[$filetype['base_extension']]['disabled'] = ($types_edit_lock) ? 'disabled' : '';
-                $sub_extensions = ' - ';
+                $extensions = ' - ' . $filetype['base_extension'];
 
                 if (!empty($filetype['sub_extensions']))
                 {
                     foreach (json_decode($filetype['sub_extensions'], true) as $sub_extension)
                     {
-                        $sub_extensions .= $sub_extension . ', ';
+                        $extensions .= ', ' . $sub_extension;
                     }
                 }
 
-                $filetype_set[$filetype['base_extension']]['label'] .= substr($sub_extensions, 0, -2);
+                $filetype_set[$filetype['base_extension']]['type_label'] .= $extensions;
             }
 
             $entry_row['entry'] = array();
@@ -136,7 +135,6 @@ class OutputPanelBoardSettings extends Output
         {
             $setting_data = array();
             $setting_data['setting_name'] = $setting['setting_name'];
-            $setting_data['setting_label'] = $setting['setting_label'];
             $setting_data['setting_description'] = $setting['setting_description'];
             $setting_options = json_decode($setting['setting_options'], true) ?? array();
             $input_attributes = json_decode($setting['input_attributes'], true) ?? array();

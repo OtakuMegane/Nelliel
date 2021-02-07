@@ -16,27 +16,15 @@ class ContentFile extends ContentHandler
     protected $content_table;
     protected $src_path;
     protected $preview_path;
-    protected $archived;
 
-    function __construct(ContentID $content_id, Domain $domain, bool $archived = false)
+    function __construct(ContentID $content_id, Domain $domain)
     {
         $this->database = $domain->database();
         $this->content_id = $content_id;
         $this->domain = $domain;
-        $this->archived = $archived;
         $this->content_table = $this->domain->reference('content_table');
-
-        if ($archived)
-        {
-            $this->src_path = $this->domain->reference('archive_src_path');
-            $this->preview_path = $this->domain->reference('archive_preview_path');
-        }
-        else
-        {
-            $this->src_path = $this->domain->reference('src_path');
-            $this->preview_path = $this->domain->reference('preview_path');
-        }
-
+        $this->src_path = $this->domain->reference('src_path');
+        $this->preview_path = $this->domain->reference('preview_path');
         $this->storeMoar(new Moar());
     }
 
@@ -52,10 +40,10 @@ class ContentFile extends ContentHandler
             return false;
         }
 
-        $result['md5'] = nel_convert_hash_from_storage($result['ip_address']);
-        $result['sha1'] = nel_convert_hash_from_storage($result['ip_address']);
-        $result['sha256'] = nel_convert_hash_from_storage($result['ip_address']);
-        $result['sha512'] = nel_convert_hash_from_storage($result['ip_address']);
+        $result['md5'] = nel_convert_hash_from_storage($result['md5']);
+        $result['sha1'] = nel_convert_hash_from_storage($result['sha1']);
+        $result['sha256'] = nel_convert_hash_from_storage($result['sha256']);
+        $result['sha512'] = nel_convert_hash_from_storage($result['sha512']);
         $this->content_data = $result;
         $moar = $result['moar'] ?? '';
         $this->getMoar()->storeFromJSON($moar);
@@ -155,15 +143,15 @@ class ContentFile extends ContentHandler
 
             if ($this->domain->reference('locked'))
             {
-                nel_derp(51, _gettext('Cannot remove file. Board is locked.'));
+                nel_derp(61, _gettext('Cannot remove file. Board is locked.'));
             }
         }
 
         $this->removeFromDisk();
         $this->removeFromDatabase();
-        $post = new ContentPost($this->content_id, $this->domain, $this->archived);
+        $post = new ContentPost($this->content_id, $this->domain);
         $post->updateCounts();
-        $thread = new ContentThread($this->content_id, $this->domain, $this->archived);
+        $thread = new ContentThread($this->content_id, $this->domain);
         $thread->updateCounts();
     }
 
@@ -217,8 +205,12 @@ class ContentFile extends ContentHandler
         return $post->verifyModifyPerms();
     }
 
-    public function isArchived()
+    public function getParent()
     {
-        return $this->archived;
+        $content_id = new \Nelliel\Content\ContentID();
+        $content_id->changeThreadID($this->content_id->threadID());
+        $content_id->changePostID($this->content_id->postID());
+        $parent_post = new ContentPost($content_id, $this->domain);
+        return $parent_post;
     }
 }

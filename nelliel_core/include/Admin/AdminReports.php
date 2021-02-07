@@ -8,15 +8,16 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminReports extends Admin
 {
     private $defaults = false;
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
@@ -44,23 +45,41 @@ class AdminReports extends Admin
 
     public function remove()
     {
+        $this->verifyAction();
         $report_id = $_GET['report_id'];
-
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_reports'))
-        {
-            nel_derp(381, _gettext('You are not allowed to dismiss reports.'));
-        }
-
         $prepared = $this->database->prepare('DELETE FROM "' . NEL_REPORTS_TABLE . '" WHERE "report_id" = ?');
         $this->database->executePrepared($prepared, [$report_id]);
         $this->outputMain(true);
     }
 
-    private function verifyAccess()
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_reports'))
         {
-            nel_derp(380, _gettext('You are not allowed to access the reports panel.'));
+            nel_derp(380, _gettext('You do not have access to the Reports panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_reports'))
+        {
+            nel_derp(381, _gettext('You are not allowed to manage reports.'));
         }
     }
 }

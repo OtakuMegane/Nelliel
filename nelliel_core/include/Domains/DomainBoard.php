@@ -17,7 +17,7 @@ class DomainBoard extends Domain implements NellielCacheInterface
 
     public function __construct(string $domain_id, NellielPDO $database)
     {
-        $this->domain_id = $domain_id;
+        $this->id = $domain_id;
         $this->database = $database;
         $this->utilitySetup();
         $this->locale();
@@ -28,27 +28,21 @@ class DomainBoard extends Domain implements NellielCacheInterface
 
     protected function loadSettings()
     {
-        $settings = $this->cache_handler->loadArrayFromCache($this->domain_id . '/domain_settings.php',
-                'domain_settings');
+        $settings = $this->cache_handler->loadArrayFromFile('domain_settings', 'domain_settings.php', 'domains/' . $this->id);
 
         if (empty($settings))
         {
             $settings = $this->loadSettingsFromDatabase();
-
-            if (NEL_USE_INTERNAL_CACHE)
-            {
-                $this->cache_handler->writeCacheFile(NEL_CACHE_FILES_PATH . $this->domain_id . '/',
-                        'domain_settings.php', '$domain_settings = ' . var_export($settings, true) . ';');
-            }
+            $this->cache_handler->writeArrayToFile('domain_settings', $settings, 'domain_settings.php', 'domains/' . $this->id);
         }
 
-        $this->domain_settings = $settings;
+        $this->settings = $settings;
     }
 
     protected function loadReferences()
     {
         $prepared = $this->database->prepare('SELECT * FROM "nelliel_board_data" WHERE "board_id" = ?');
-        $board_data = $this->database->executePreparedFetch($prepared, [$this->domain_id], PDO::FETCH_ASSOC);
+        $board_data = $this->database->executePreparedFetch($prepared, [$this->id], PDO::FETCH_ASSOC);
         $new_reference = array();
         $board_path = NEL_BASE_PATH . $board_data['board_id'] . '/';
         $board_web_path = NEL_BASE_WEB_PATH . rawurlencode($board_data['board_id']) . '/';
@@ -58,7 +52,7 @@ class DomainBoard extends Domain implements NellielCacheInterface
         $new_reference['src_dir'] = 'src';
         $new_reference['preview_dir'] = 'preview';
         $new_reference['page_dir'] = 'threads';
-        $new_reference['archive_dir'] = 'archive';
+        $new_reference['banner_dir'] = 'banners';
         $new_reference['board_path'] = $board_path;
         $new_reference['board_web_path'] = $board_web_path;
         $new_reference['src_path'] = $board_path . $new_reference['src_dir'] . '/';
@@ -67,19 +61,14 @@ class DomainBoard extends Domain implements NellielCacheInterface
         $new_reference['preview_web_path'] = $board_web_path . rawurlencode($new_reference['preview_dir']) . '/';
         $new_reference['page_path'] = $board_path . $new_reference['page_dir'] . '/';
         $new_reference['page_web_path'] = $board_web_path . rawurlencode($new_reference['page_dir']) . '/';
-        $new_reference['archive_path'] = $board_path . $new_reference['archive_dir'] . '/';
-        $new_reference['archive_src_path'] = $board_path . $new_reference['archive_dir'] . '/' .
-                $new_reference['src_dir'] . '/';
-        $new_reference['archive_preview_path'] = $board_path . $new_reference['archive_dir'] . '/' .
-                $new_reference['preview_dir'] . '/';
-        $new_reference['archive_page_path'] = $board_path . $new_reference['archive_dir'] . '/' .
-                $new_reference['page_dir'] . '/';
+        $new_reference['banner_path'] = $board_path . $new_reference['banner_dir'] . '/';
+        $new_reference['banner_web_path'] = $board_web_path . rawurlencode($new_reference['banner_dir']) . '/';
         $new_reference['posts_table'] = $new_reference['db_prefix'] . '_posts';
         $new_reference['threads_table'] = $new_reference['db_prefix'] . '_threads';
         $new_reference['content_table'] = $new_reference['db_prefix'] . '_content';
         $new_reference['config_table'] = $new_reference['db_prefix'] . '_config';
         $new_reference['log_table'] = $new_reference['db_prefix'] . '_logs';
-        $this->domain_references = $new_reference;
+        $this->references = $new_reference;
     }
 
     protected function loadSettingsFromDatabase()
@@ -87,7 +76,7 @@ class DomainBoard extends Domain implements NellielCacheInterface
         $settings = array();
         $prepared = $this->database->prepare(
                 'SELECT "db_prefix" FROM "' . NEL_BOARD_DATA_TABLE . '" WHERE "board_id" = ?');
-        $db_prefix = $this->database->executePreparedFetch($prepared, [$this->domain_id], PDO::FETCH_COLUMN);
+        $db_prefix = $this->database->executePreparedFetch($prepared, [$this->id], PDO::FETCH_COLUMN);
         $config_table = $db_prefix . '_config';
         $config_list = $this->database->executeFetchAll(
                 'SELECT * FROM "' . NEL_SETTINGS_TABLE . '" INNER JOIN "' . $config_table . '" ON "' . NEL_SETTINGS_TABLE .
@@ -113,28 +102,28 @@ class DomainBoard extends Domain implements NellielCacheInterface
         return new DomainMultiBoard($this->database);
     }
 
-    public function boardExists()
+    public function exists()
     {
         $prepared = $this->database->prepare('SELECT 1 FROM "nelliel_board_data" WHERE "board_id" = ?');
-        $board_data = $this->database->executePreparedFetch($prepared, [$this->domain_id], PDO::FETCH_COLUMN);
+        $board_data = $this->database->executePreparedFetch($prepared, [$this->id], PDO::FETCH_COLUMN);
         return !empty($board_data);
     }
 
     public function regenCache()
     {
-        if (NEL_USE_INTERNAL_CACHE)
+        if (NEL_USE_FILE_CACHE)
         {
             $this->cacheSettings();
             $filetypes = new FileTypes($this->database());
-            $filetypes->generateSettingsCache($this->domain_id);
+            $filetypes->generateSettingsCache($this->id);
         }
     }
 
     public function deleteCache()
     {
-        if (NEL_USE_INTERNAL_CACHE)
+        if (NEL_USE_FILE_CACHE)
         {
-            $this->file_handler->eraserGun(NEL_CACHE_FILES_PATH . $this->domain_id);
+            $this->file_handler->eraserGun(NEL_CACHE_FILES_PATH . $this->id);
         }
     }
 }

@@ -367,7 +367,7 @@ class LanguageExtractor
     private function parseDatabaseEntries(array $strings, string $default_category)
     {
         $database = $this->domain->database();
-        $filetype_labels = $database->executeFetchAll('SELECT "label" FROM "' . NEL_FILETYPES_TABLE . '"',
+        $filetype_labels = $database->executeFetchAll('SELECT "type_label" FROM "' . NEL_FILETYPES_TABLE . '"',
                 PDO::FETCH_COLUMN);
 
         foreach ($filetype_labels as $label)
@@ -377,12 +377,12 @@ class LanguageExtractor
                 $msgid = $label;
                 $strings[$default_category][$msgid]['msgid'] = $label;
                 $strings[$default_category][$msgid]['comments']['(Database) Table: ' . NEL_FILETYPES_TABLE .
-                        ' | Column: label'] = '#:';
+                        ' | Column: type_label'] = '#:';
             }
         }
 
         $permission_descriptions = $database->executeFetchAll(
-                'SELECT "description" FROM "' . NEL_PERMISSIONS_TABLE . '"', PDO::FETCH_COLUMN);
+                'SELECT "perm_description" FROM "' . NEL_PERMISSIONS_TABLE . '"', PDO::FETCH_COLUMN);
 
         foreach ($permission_descriptions as $description)
         {
@@ -391,35 +391,21 @@ class LanguageExtractor
                 $msgid = $description;
                 $strings[$default_category][$msgid]['msgid'] = $description;
                 $strings[$default_category][$msgid]['comments']['(Database) Table: ' . NEL_PERMISSIONS_TABLE .
-                        ' | Column: description'] = '#:';
+                        ' | Column: perm_description'] = '#:';
             }
         }
 
-        $setting_descriptions = $database->executeFetchAll(
-                'SELECT "setting_description" FROM "' . NEL_SETTINGS_TABLE . '"', PDO::FETCH_COLUMN);
-
-        foreach ($setting_descriptions as $description)
-        {
-            if ($description !== '' && !is_null($description))
-            {
-                $msgid = $description;
-                $strings[$default_category][$msgid]['msgid'] = $description;
-                $strings[$default_category][$msgid]['comments']['(Database) Table: ' . NEL_SETTINGS_TABLE .
-                        ' | Column: setting_description'] = '#:';
-            }
-        }
-
-        $setting_labels = $database->executeFetchAll('SELECT "setting_label" FROM "' . NEL_SETTINGS_TABLE . '"',
+        $setting_descriptions = $database->executeFetchAll('SELECT "setting_description" FROM "' . NEL_SETTINGS_TABLE . '"',
                 PDO::FETCH_COLUMN);
 
-        foreach ($setting_labels as $label)
+        foreach ($setting_descriptions as $label)
         {
             if ($label !== '' && !is_null($label))
             {
                 $msgid = $label;
                 $strings[$default_category][$msgid]['msgid'] = $label;
                 $strings[$default_category][$msgid]['comments']['(Database) Table: ' . NEL_SETTINGS_TABLE .
-                        ' | Column: setting_label'] = '#:';
+                        ' | Column: setting_description'] = '#:';
             }
         }
 

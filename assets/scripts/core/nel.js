@@ -11,27 +11,25 @@ function dataBin() {
 
 nelliel.setup.doImportantStuff = function(board_id, is_modmode) {
     dataBin.board_id = board_id;
+    dataBin.style_override = nelliel.core.retrieveFromLocalStorage("style_override", false);
+    setStyle(dataBin.style_override);
     dataBin.is_modmode = is_modmode;
     dataBin.hidden_threads_id = "hidden_threads_" + board_id;
     dataBin.hidden_posts_id = "hidden_posts_" + board_id;
+    dataBin.hidden_files_id = "hidden_files_" + board_id;
+    dataBin.hidden_embeds_id = "hidden_embeds_" + board_id;
     nelliel.setup.localStorageInitCheck();
     dataBin.hidden_threads = nelliel.core.retrieveFromLocalStorage(dataBin.hidden_threads_id, true);
     dataBin.hidden_posts = nelliel.core.retrieveFromLocalStorage(dataBin.hidden_posts_id, true);
+    dataBin.hidden_files = nelliel.core.retrieveFromLocalStorage(dataBin.hidden_files_id, true);
+    dataBin.hidden_embeds = nelliel.core.retrieveFromLocalStorage(dataBin.hidden_embeds_id, true);
     dataBin.collapsedThreads = [];
-
-    if (board_id === "") {
-        setStyle(nelliel.core.getCookie("base-style"));
-    }
-    else {
-        setStyle(nelliel.core.getCookie("style-" + board_id));
-    }
-
     nelliel.setup.setupListeners();
     nelliel.core.hashHandler();
     
     if (board_id !== "") {
         nelliel.setup.fillForms(board_id);
-        nelliel.ui.applyHidePostThread();
+        nelliel.ui.applyHideContent();
     }
     
     nelliel.core.unhideJSonly();
@@ -45,6 +43,14 @@ nelliel.setup.localStorageInitCheck = function() {
     if (!localStorage[dataBin.hidden_posts_id]) {
         localStorage[dataBin.hidden_posts_id] = '{}';
     }
+    
+    if (!localStorage[dataBin.hidden_files_id]) {
+        localStorage[dataBin.hidden_files_id] = '{}';
+    }
+    
+    if (!localStorage[dataBin.hidden_embeds_id]) {
+        localStorage[dataBin.hidden_embeds_id] = '{}';
+    }
 }
 
 nelliel.setup.setupListeners = function() {
@@ -57,19 +63,23 @@ nelliel.setup.setupListeners = function() {
 
         for (var j = 0; j < list_length; j++) {
             if (events_list[j].includes("click")) {
-                nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "click", nelliel.events.processPostClicks);
+                nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "click", nelliel.events.processPostClick);
             }
-            
+
             if (events_list[j].includes("mouseover")) {
                 nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "mouseover", nelliel.events.processMouseOver);
             }
-            
+
             if (events_list[j].includes("mouseout")) {
                 nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "mouseout", nelliel.events.processMouseOut);
             }
-            
+
             if (events_list[j].includes("change")) {
-                nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "change", nelliel.events.processChanges);
+                nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "change", nelliel.events.processChange);
+            }
+            
+            if (events_list[j].includes("input")) {
+                nelliel.setup.addListenerIfElementExists(jsevents_elements[i], "input", nelliel.events.processInput);
             }
         }
     }
@@ -84,23 +94,20 @@ nelliel.setup.addListenerIfElementExists = function(element, event, event_handle
 }
 
 nelliel.setup.fillForms = function(board) {
-    var pwd = nelliel.core.getCookie("pwd-" + board);
-    var name = nelliel.core.getCookie("name-" + board);
-    
-    if (pwd !== null) {
+    var post_password = nelliel.core.retrieveFromLocalStorage("post_password", false);
+
+    if (post_password !== null) {
         if (document.getElementById("posting-form-sekrit") !== null) {
-            document.getElementById("posting-form-sekrit").value = pwd;
+            document.getElementById("posting-form-sekrit").value = post_password;
         }
 
         if (document.getElementById("update-sekrit") !== null) {
-            document.getElementById("update-sekrit").value = pwd;
+            document.getElementById("update-sekrit").value = post_password;
         }
     }
-
-    /* document.getElementById("not-anonymous").value = name; */
 }
 
-nelliel.events.processPostClicks = function(event) {
+nelliel.events.processPostClick = function(event) {
     if (event.target.hasAttribute("data-command")) {
         if (event.target.hasAttribute("data-content-id")) {
             var content_id = nelliel.core.contentID(event.target.getAttribute("data-content-id"))
@@ -112,8 +119,8 @@ nelliel.events.processPostClicks = function(event) {
             nelliel.ui.expandCollapseThread(event.target, command);
         } else if (command === "expand-thread-render" || command === "collapse-thread-render") {
             nelliel.ui.expandCollapseThread(event.target, command, true);
-        } else if (command === "link-post") {
-            nelliel.ui.linkPost(event.target);
+        } else if (command === "cite-post") {
+            nelliel.ui.citePost(event.target);
         } else if (command === "show-file-meta" || command === "hide-file-meta") {
             nelliel.ui.showHideFileMeta(event.target);
         } else if (command === "add-file-meta") {
@@ -121,10 +128,14 @@ nelliel.events.processPostClicks = function(event) {
         } else if (command === "inline-expand" || command === "inline-reduce") {
             nelliel.ui.inlineExpandReduce(event.target, command);
             event.preventDefault();
-        } else if (command === "hide-post" || command === "show-post" ) {
-            nelliel.ui.hideShowPost(event.target, command);
         } else if (command === "hide-thread" || command === "show-thread" ) {
-            nelliel.ui.hideShowThread(event.target, command);
+            nelliel.ui.hideShowThread(event.target, command, content_id);
+        } else if (command === "hide-post" || command === "show-post" ) {
+            nelliel.ui.hideShowPost(event.target, command, content_id);
+        } else if (command === "hide-file" || command === "show-file" ) {
+            nelliel.ui.hideShowFile(event.target, command, content_id);
+        } else if (command === "hide-embed" || command === "show-embed" ) {
+            nelliel.ui.hideShowEmbed(event.target, command, content_id);
         } else if (command === "reload-captcha" ) {
             reloadCAPTCHA(event.target, command);
         }
@@ -155,8 +166,8 @@ nelliel.events.processMouseOut = function(event) {
     }
 }
 
-nelliel.events.processChanges = function(event) {
-    if (event.target.hasAttribute("data-command")) {
+nelliel.events.processChange = function(event) {
+	if (event.target.hasAttribute("data-command")) {
         var command = event.target.getAttribute("data-command");
 
         if (command === "reveal-file-input") {
@@ -167,24 +178,14 @@ nelliel.events.processChanges = function(event) {
     }
 }
 
-nelliel.core.setCookie = function(c_name, value, expiredays) {
-    var exdate = new Date();
-    exdate.setDate(exdate.getDate() + expiredays);
-    document.cookie = c_name + "=" + escape(value) + ((expiredays == null) ? "" : ";expires=" + exdate.toGMTString())
-            + ";path=/";
-}
+nelliel.events.processInput = function(event) {
+	if (event.target.id === "posting-form-sekrit") {
+		updatePostPassword(event.target.value);
+	}
 
-nelliel.core.getCookie = function(key) {
-    var csplit = document.cookie.split('; ');
-
-    for (var i = 0; i < csplit.length; i++) {
-        var s2 = csplit[i].split('=');
-        if (s2[0] == key) {
-            return s2[1];
-        }
+    if (event.target.hasAttribute("data-command")) {
+        var command = event.target.getAttribute("data-command");
     }
-
-    return null;
 }
 
 nelliel.core.storeInLocalStorage = function(data_path, data) {
@@ -249,6 +250,10 @@ nelliel.core.unhideJSonly = function () {
     }
 }
 
+function updatePostPassword(new_password) {
+    nelliel.core.storeInLocalStorage("post_password", new_password);
+}
+
 function addNewFileMeta(element, command) {
     var target_id = element.id.replace("add-", "form-");
     var target_element = document.getElementById(target_id);
@@ -256,39 +261,40 @@ function addNewFileMeta(element, command) {
     element.className += " hidden";
 }
 
-function setStyle(style, update_cookie = false) {
-    if (style == null) {
-        return;
-    }
-    
-    if (update_cookie) {
-        if (dataBin.board_id == "") {
-            style_cookie = "base-style";
-        } else {
-            style_cookie = "style-" + dataBin.board_id;
-        }
-        
-        nelliel.core.setCookie(style_cookie, style, 9001);
-    }
+function setStyle(style, update = false) {
+	var empty_style = style == null || style === "";
 
+    if (update) {
+        nelliel.core.storeInLocalStorage("style_override", style);
+    }
 
     var allstyles = document.getElementsByTagName("link");
+    var menu_style = null;
 
     for (i = 0; i < allstyles.length; i++) {
         if (allstyles[i].getAttribute("data-style-type") == "style-board") {
+            var style_id = allstyles[i].getAttribute("data-id");
             allstyles[i].disabled = true;
 
-            if (allstyles[i].getAttribute("data-id") == style) {
-                allstyles[i].disabled = false;
+            if (empty_style) {
+                if (allstyles[i].getAttribute("rel") === "stylesheet") {
+                    allstyles[i].disabled = false;
+                    menu_style = style_id;
+                }
+            } else {
+                if (style_id === style) {
+                    allstyles[i].disabled = false;
+                    menu_style = style_id;
+                }
             }
         }
     }
 
     var style_menus = document.getElementsByClassName("styles-menu");
-    
+
     for (i = 0; i < style_menus.length; i++) {
-        style_menus.item(i).value = style;
-      } 
+        style_menus.item(i).value = menu_style;
+    } 
 }
 
 function reloadCAPTCHA(event_target, command) {

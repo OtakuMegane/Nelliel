@@ -12,7 +12,6 @@ use PDO;
 
 class OutputPanelThreads extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -42,9 +41,8 @@ class OutputPanelThreads extends Output
 
     private function renderPanel(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/thread');
         $parameters['is_panel'] = true;
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Threads');
@@ -109,7 +107,7 @@ class OutputPanelThreads extends Output
                     $thread['thread_id'] . '.html';
             $thread_info['op_name'] = $op_post['poster_name'];
 
-            if ($this->session->sessionUser()->checkPermission($this->domain, 'perm_view_unhashed_ip') &&
+            if ($this->session->user()->checkPermission($this->domain, 'perm_view_unhashed_ip') &&
                     !empty($post_data['ip_address']))
             {
                 $thread_info['op_ip'] = @inet_ntop($op_post['ip_address']);
@@ -133,9 +131,7 @@ class OutputPanelThreads extends Output
 
     private function renderExpandedThread(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
         $this->setBodyTemplate('panels/thread_expand');
         $thread_id = $parameters['thread_id'] ?? 0;
         $output_head = new OutputHead($this->domain, $this->write_mode);

@@ -28,22 +28,32 @@ class FileTypes
     {
         $extensions = array();
         $types = array();
-        $db_results = $this->database->executeFetchAll('SELECT * FROM "nelliel_filetypes" ORDER BY "entry" ASC',
-                PDO::FETCH_ASSOC);
 
-        foreach ($db_results as $result)
+        if (!$ignore_cache)
         {
-            if ($result['type_def'] == 1)
+            $filetype_data = $this->cache_handler->loadArrayFromFile('filetype_data', 'filetype_data.php');
+        }
+
+        if(empty($filetype_data))
+        {
+            $filetype_data = $this->database->executeFetchAll('SELECT * FROM "nelliel_filetypes" ORDER BY "entry" ASC',
+                    PDO::FETCH_ASSOC);
+            $this->cache_handler->writeArrayToFile('filetype_data', $filetype_data, 'filetype_data.php');
+        }
+
+        foreach ($filetype_data as $data)
+        {
+            if ($data['type_def'] == 1)
             {
-                $types[$result['type']] = $result;
+                $types[$data['type']] = $data;
                 continue;
             }
             else
             {
-                $base_extension = $result['base_extension'];
+                $base_extension = $data['base_extension'];
                 $extensions_map[$base_extension] = $base_extension;
-                $extensions[$base_extension] = $result;
-                $sub_extensions = json_decode($result['sub_extensions'], true);
+                $extensions[$base_extension] = $data;
+                $sub_extensions = json_decode($data['sub_extensions'], true);
 
                 if (empty($sub_extensions))
                 {
@@ -71,7 +81,7 @@ class FileTypes
 
         if (!$ignore_cache)
         {
-            $settings = $this->cache_handler->loadArrayFromCache($domain_id . '/filetype_settings.php', 'settings');
+            $settings = $this->cache_handler->loadArrayFromFile('settings', 'filetype_settings.php', $domain_id);
         }
 
         if (empty($settings))
@@ -198,17 +208,17 @@ class FileTypes
         $file_test_begin = file_get_contents($file_path, null, null, 0, 65535);
         $file_test_end = file_get_contents($file_path, null, null, $end_offset);
         $extension_data = $this->extensionData($extension);
-        return preg_match('/' . $extension_data['id_regex'] . '/', $file_test_begin) ||
-                preg_match('/' . $extension_data['id_regex'] . '/', $file_test_end);
+        return preg_match('/' . $extension_data['id_regex'] . '/s', $file_test_begin) ||
+                preg_match('/' . $extension_data['id_regex'] . '/s', $file_test_end);
     }
 
     public function generateSettingsCache(string $domain_id)
     {
-        if (NEL_USE_INTERNAL_CACHE)
+        if (NEL_USE_FILE_CACHE)
         {
             $this->loadSettingsIfNot($domain_id, true);
-            $this->cache_handler->writeCacheFile(NEL_CACHE_FILES_PATH . $domain_id . '/', 'filetype_settings.php',
-                    '$settings = ' . var_export(self::$settings[$domain_id], true) . ';');
+            $this->cache_handler->writeArrayToFile('settings', self::$settings[$domain_id], 'filetype_settings.php',
+                    'domains/' . $domain_id);
         }
     }
 

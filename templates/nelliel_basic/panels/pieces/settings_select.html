@@ -3,12 +3,12 @@
 		{{> panels/pieces/settings_lock_update }}
 	{{/ show_lock_update }}
 	<span class="display-cell">
-		<span data-i18n="gettext">{{ setting_label }}</span>
+		<span data-i18n="gettext">{{ setting_description }}</span>
 	</span>
 	<span class="display-cell">
 		<select name="{{ setting_name }}[value]" id="{{ setting_name }}" {{ setting_disabled }}>
 		{{# options }}
-			<option value="{{ option_name }}" {{ option_selected }}>{{ option_name }}</option>
+			<option value="{{ option_name }}" {{ option_selected }}>{{ option_label }}</option>
 		{{/ options }}
 		</select>
 	</span>

@@ -12,7 +12,6 @@ use PDO;
 
 class OutputCatalog extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -21,9 +20,8 @@ class OutputCatalog extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('catalog');
         $cites = new \Nelliel\Cites($this->database);
         $output_head = new OutputHead($this->domain, $this->write_mode);
@@ -50,6 +48,7 @@ class OutputCatalog extends Output
                 continue;
             }
 
+            $first_post['render_cache'] = json_decode($first_post['cache'], true);
             $post_content_id = new \Nelliel\Content\ContentId(
                     'cid_' . $thread['thread_id'] . '_' . $first_post['post_number']);
             $thread_page_web_path = $this->domain->reference('page_web_path') . $thread['thread_id'] . '/thread-' .
@@ -72,14 +71,32 @@ class OutputCatalog extends Output
 
                     foreach ($segments as $segment)
                     {
-                        $link_url = $cites->createPostLinkURL($this->domain, $post_content_id, $segment);
+                        $cite_info = $cites->citeType($segment);
+                        $cite_url = '';
 
-                        if (!empty($link_url))
+                        if (!empty($cite_info['type']))
+                        {
+                            if (isset($first_post['render_cache']['cites'][$segment]))
+                            {
+                                $cite_data = $first_post['render_cache']['cites'][$segment];
+                            }
+                            else
+                            {
+                                $cite_data = $cites->getCiteData($segment, $this->domain, $post_content_id);
+                            }
+
+                            if ($cite_data['exists'])
+                            {
+                                $cite_url = $cites->createPostLinkURL($cite_data, $this->domain);
+                            }
+                        }
+
+                        if (!empty($cite_url))
                         {
                             if (preg_match('#^\s*>#', $segment) === 1)
                             {
                                 $link = array();
-                                $link['link_url'] = $link_url;
+                                $link['link_url'] = $cite_url;
                                 $link['link_text'] = $segment;
                                 $line_parts[]['link'] = $link;
                             }
@@ -113,11 +130,11 @@ class OutputCatalog extends Output
                 $width = $first_file['preview_width'];
                 $height = $first_file['preview_height'];
 
-                if ($width > $this->domain->setting('max_catalog_width') ||
-                        $height > $this->domain->setting('max_catalog_height'))
+                if ($width > $this->domain->setting('max_catalog_display_width') ||
+                        $height > $this->domain->setting('max_catalog_display_height'))
                 {
-                    $ratio = min(($this->domain->setting('max_catalog_height') / $height),
-                            ($this->domain->setting('max_catalog_width') / $width));
+                    $ratio = min(($this->domain->setting('max_catalog_display_height') / $height),
+                            ($this->domain->setting('max_catalog_display_width') / $width));
                     $width = intval($ratio * $width);
                     $height = intval($ratio * $height);
                 }
@@ -135,7 +152,7 @@ class OutputCatalog extends Output
                 $thread_data['open_text'] = _gettext('Open thread');
             }
 
-            ++ $thread_count;
+            $thread_count ++;
             $this->render_data['catalog_entries'][] = $thread_data;
         }
 

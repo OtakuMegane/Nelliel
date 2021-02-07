@@ -32,6 +32,8 @@ abstract class ContentHandler
 
     protected abstract function verifyModifyPerms();
 
+    public abstract function getParent();
+
     public function storeMoar(Moar $moar)
     {
         $this->content_moar = $moar;
@@ -84,5 +86,10 @@ abstract class ContentHandler
         $old_data = $this->data($key);
         $this->content_data[$key] = $new_data;
         return $old_data;
+    }
+
+    public function domain()
+    {
+        return $this->domain;
     }
 }

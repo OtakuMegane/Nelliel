@@ -11,7 +11,6 @@ use Nelliel\Domains\Domain;
 
 class OutputDerp extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -20,9 +19,8 @@ class OutputDerp extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('derp');
         $output_head = new OutputHead($this->domain, $this->write_mode);
         $this->render_data['head'] = $output_head->render([], true);
@@ -32,7 +30,6 @@ class OutputDerp extends Output
         $this->render_data['error_id'] = $diagnostic['error_id'];
         $this->render_data['error_message'] = $diagnostic['error_message'];
         $this->render_data['error_data'] = '';
-        $session = new \Nelliel\Account\Session();
 
         if ($this->domain->id() === Domain::SITE)
         {
@@ -43,7 +40,7 @@ class OutputDerp extends Output
             $return_url = NEL_BASE_WEB_PATH . $this->domain->reference('board_directory');
         }
 
-        if ($session->inModmode($this->domain))
+        if ($this->session->inModmode($this->domain))
         {
             if ($this->domain->id() === Domain::SITE)
             {
@@ -54,7 +51,7 @@ class OutputDerp extends Output
                 $return_url = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'render', 'actions' => 'view-index', 'index' => '0',
-                                    'board_id' => $this->domain->id(), 'modmode' => 'true']);
+                                    'board-id' => $this->domain->id(), 'modmode' => 'true']);
             }
         }
 

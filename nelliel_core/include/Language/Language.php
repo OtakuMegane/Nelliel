@@ -59,7 +59,7 @@ class Language
             $hash = md5_file($file);
         }
 
-        if (NEL_USE_INTERNAL_CACHE && $cache_handler->checkHash($file_id, $hash))
+        if (NEL_USE_FILE_CACHE && $cache_handler->checkHash($file_id, $hash))
         {
             if (file_exists(NEL_CACHE_FILES_PATH . $cache_file))
             {
@@ -73,11 +73,10 @@ class Language
             $po_parser = new \SmallPHPGettext\ParsePo();
             $language_array = $po_parser->parseFile($file, $domain_id);
 
-            if (NEL_USE_INTERNAL_CACHE)
+            if (NEL_USE_FILE_CACHE)
             {
                 $cache_handler->updateHash($file_id, $hash);
-                $cache_handler->writeCacheFile(NEL_CACHE_FILES_PATH, $cache_file,
-                        '$language_array = ' . var_export($language_array, true) . ';');
+                $cache_handler->writeArrayToFile('language_array', $language_array, $cache_file);
             }
 
             $loaded = true;
@@ -91,7 +90,7 @@ class Language
     {
         if (!$user->checkPermission($domain, 'perm_extract_gettext'))
         {
-            nel_derp(390, _gettext('You are not allowed to extract the gettext strings.'));
+            nel_derp(660, _gettext('You are not allowed to extract the gettext strings.'));
         }
 
         $extractor = new \Nelliel\Language\LanguageExtractor($domain);

@@ -13,14 +13,11 @@ use PDO;
 
 class DomainSite extends Domain implements NellielCacheInterface
 {
-    private $file_filters;
-    private $settings_cache_file;
 
     public function __construct(NellielPDO $database)
     {
-        $this->domain_id = Domain::SITE;
+        $this->id = Domain::SITE;
         $this->database = $database;
-        $this->settings_cache_file = $this->domain_id . '/' . 'domain_settings.php';
         $this->utilitySetup();
         $this->locale();
         $this->templatePath(
@@ -29,27 +26,24 @@ class DomainSite extends Domain implements NellielCacheInterface
 
     protected function loadSettings()
     {
-        $settings = $this->cache_handler->loadArrayFromCache($this->settings_cache_file, 'domain_settings');
+        $settings = $this->cache_handler->loadArrayFromFile('domain_settings', 'domain_settings.php',
+                'domains/' . $this->id);
 
         if (empty($settings))
         {
             $settings = $this->loadSettingsFromDatabase();
-
-            if (NEL_USE_INTERNAL_CACHE)
-            {
-                $this->cache_handler->writeCacheFile(NEL_CACHE_FILES_PATH . $this->domain_id . '/',
-                        'domain_settings.php', '$domain_settings = ' . var_export($settings, true) . ';');
-            }
+            $this->cache_handler->writeArrayToFile('domain_settings', $settings, 'domain_settings.php',
+                    'domains/' . $this->id);
         }
 
-        $this->domain_settings = $settings;
+        $this->settings = $settings;
     }
 
     protected function loadReferences()
     {
         $new_reference = array();
         $new_reference['log_table'] = NEL_LOGS_TABLE;
-        $this->domain_references = $new_reference;
+        $this->references = $new_reference;
     }
 
     protected function loadSettingsFromDatabase()
@@ -74,29 +68,9 @@ class DomainSite extends Domain implements NellielCacheInterface
         return false;
     }
 
-    public function fileFilters()
-    {
-        if (empty($this->file_filters))
-        {
-            $loaded = false;
-
-            if (!$loaded)
-            {
-                $filters = $this->database->executeFetchAll(
-                        'SELECT "hash_type", "file_hash" FROM "nelliel_file_filters"', PDO::FETCH_ASSOC);
-                foreach ($filters as $filter)
-                {
-                    $this->file_filters[$filter['hash_type']][] = $filter['file_hash'];
-                }
-            }
-        }
-
-        return $this->file_filters;
-    }
-
     public function regenCache()
     {
-        if (NEL_USE_INTERNAL_CACHE)
+        if (NEL_USE_FILE_CACHE)
         {
             $this->cacheSettings();
         }
@@ -104,9 +78,9 @@ class DomainSite extends Domain implements NellielCacheInterface
 
     public function deleteCache()
     {
-        if (NEL_USE_INTERNAL_CACHE)
+        if (NEL_USE_FILE_CACHE)
         {
-            $this->file_handler->eraserGun(NEL_CACHE_FILES_PATH . $this->domain_id);
+            $this->file_handler->eraserGun(NEL_CACHE_FILES_PATH . $this->id);
         }
     }
 }

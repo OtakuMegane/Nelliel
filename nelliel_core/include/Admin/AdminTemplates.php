@@ -8,33 +8,32 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminTemplates extends Admin
 {
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
     {
+        $this->verifyAccess();
         $output_panel = new \Nelliel\Render\OutputPanelTemplates($this->domain, false);
         $output_panel->render([], false);
     }
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_templates'))
-        {
-            nel_derp(421, _gettext('You are not allowed to install templates.'));
-        }
-
+        $this->verifyAction();
         $template_id = $_GET['template-id'];
         $template_inis = $this->domain->frontEndData()->getTemplateInis();
         $info = '';
@@ -50,7 +49,8 @@ class AdminTemplates extends Admin
         if ($info !== '')
         {
             $prepared = $this->database->prepare(
-                    'INSERT INTO "' . NEL_TEMPLATES_TABLE . '" ("template_id", "type", "is_default", "info") VALUES (?, ?, ?, ?)');
+                    'INSERT INTO "' . NEL_TEMPLATES_TABLE .
+                    '" ("template_id", "type", "is_default", "info") VALUES (?, ?, ?, ?)');
             $this->database->executePrepared($prepared, [$template_id, 'template', 0, $info]);
         }
 
@@ -59,19 +59,17 @@ class AdminTemplates extends Admin
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
     {
+        $this->verifyAction();
     }
 
     public function remove()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_templates'))
-        {
-            nel_derp(422, _gettext('You are not allowed to uninstall templates.'));
-        }
-
+        $this->verifyAction();
         $template_id = $_GET['template-id'];
         $prepared = $this->database->prepare(
                 'DELETE FROM "' . NEL_TEMPLATES_TABLE . '" WHERE "template_id" = ? AND "type" = \'template\'');
@@ -79,25 +77,40 @@ class AdminTemplates extends Admin
         $this->outputMain(true);
     }
 
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
     public function makeDefault()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_templates'))
-        {
-            nel_derp(423, _gettext('You are not allowed to set the default template.'));
-        }
-
+        $this->verifyAction();
         $template_id = $_GET['template-id'];
         $this->database->exec('UPDATE "' . NEL_TEMPLATES_TABLE . '" SET "is_default" = 0');
-        $prepared = $this->database->prepare('UPDATE "' . NEL_TEMPLATES_TABLE . '" SET "is_default" = 1 WHERE "template_id" = ?');
+        $prepared = $this->database->prepare(
+                'UPDATE "' . NEL_TEMPLATES_TABLE . '" SET "is_default" = 1 WHERE "template_id" = ?');
         $this->database->executePrepared($prepared, [$template_id]);
         $this->outputMain(true);
     }
 
-    private function verifyAccess()
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_templates'))
         {
-            nel_derp(420, _gettext('You are not allowed to access the templates panel.'));
+            nel_derp(390, _gettext('You do not have access to the Templates panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_templates'))
+        {
+            nel_derp(391, _gettext('You are not allowed to manage Templates.'));
         }
     }
 }

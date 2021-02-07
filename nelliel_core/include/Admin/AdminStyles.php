@@ -8,14 +8,15 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminStyles extends Admin
 {
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
@@ -27,15 +28,12 @@ class AdminStyles extends Admin
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_styles'))
-        {
-            nel_derp(431, _gettext('You are not allowed to install styles.'));
-        }
-
+        $this->verifyAction();
         $style_id = $_GET['style-id'];
         $style_inis = $this->domain->frontEndData()->getStyleInis();
 
@@ -55,19 +53,17 @@ class AdminStyles extends Admin
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
     {
+        $this->verifyAction();
     }
 
     public function remove()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_styles'))
-        {
-            nel_derp(432, _gettext('You are not allowed to uninstall styles.'));
-        }
-
+        $this->verifyAction();
         $style_id = $_GET['style-id'];
         $prepared = $this->database->prepare(
                 'DELETE FROM "' . NEL_ASSETS_TABLE . '" WHERE "asset_id" = ? AND "type" = \'style\'');
@@ -75,13 +71,19 @@ class AdminStyles extends Admin
         $this->outputMain(true);
     }
 
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
     public function makeDefault()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_styles'))
-        {
-            nel_derp(433, _gettext('You are not allowed to set the default style.'));
-        }
-
+        $this->verifyAction();
         $style_id = $_GET['style-id'];
         $this->database->exec('UPDATE "' . NEL_ASSETS_TABLE . '" SET "is_default" = 0 WHERE "type" = \'style\'');
         $prepared = $this->database->prepare(
@@ -90,11 +92,19 @@ class AdminStyles extends Admin
         $this->outputMain(true);
     }
 
-    private function verifyAccess()
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_styles'))
         {
-            nel_derp(440, _gettext('You are not allowed to access the styles panel.'));
+            nel_derp(410, _gettext('You do not have access to the Styles panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_styles'))
+        {
+            nel_derp(411, _gettext('You are not allowed to manage styles.'));
         }
     }
 }

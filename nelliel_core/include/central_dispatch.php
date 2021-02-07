@@ -76,9 +76,13 @@ function nel_dispatch_preparation()
 
     $inputs = nel_plugins()->processHook('nel-in-after-dispatch-prep', [$domain], $inputs);
 
-    $snacks = new \Nelliel\Snacks(nel_database(), new \Nelliel\BansAccess(nel_database()));
-    $snacks->applyBan($domain);
-    $snacks->checkHoneypot($domain);
+    if($inputs['module'] === 'threads')
+    {
+        $snacks = new \Nelliel\Snacks($domain, new \Nelliel\BansAccess(nel_database()));
+        $snacks->applyBan();
+        //$snacks->checkHoneypot();
+    }
+
     $inputs = nel_module_dispatch($inputs, $domain);
 }
 
@@ -96,12 +100,12 @@ function nel_module_dispatch(array $inputs, Domain $domain)
             break;
 
         case 'account':
-            $account_dispatch = new \Nelliel\Account\Dispatch($domain);
+            $account_dispatch = new \Nelliel\Account\Dispatch($domain, $session);
             $account_dispatch->dispatch($inputs);
             break;
 
         case 'admin':
-            $admin_dispatch = new \Nelliel\Admin\Dispatch($domain, $authorization);
+            $admin_dispatch = new \Nelliel\Admin\Dispatch($domain, $authorization, $session);
             $admin_dispatch->dispatch($inputs);
             break;
 
@@ -138,7 +142,7 @@ function nel_module_dispatch(array $inputs, Domain $domain)
             break;
 
         case 'language':
-            $language_dispatch = new \Nelliel\Language\Dispatch($domain, $authorization);
+            $language_dispatch = new \Nelliel\Language\Dispatch($domain, $authorization, $session);
             $language_dispatch->dispatch($inputs);
             break;
 
@@ -150,9 +154,14 @@ function nel_module_dispatch(array $inputs, Domain $domain)
             $content_id = new \Nelliel\Content\ContentID($inputs['content_id']);
             $fgsfds = new \Nelliel\FGSFDS();
 
+            if($session->modmodeRequested())
+            {
+                $session->init(true);
+            }
+
             if ($inputs['actions'][0] === 'new-post')
             {
-                $new_post = new \Nelliel\Post\NewPost($domain);
+                $new_post = new \Nelliel\Post\NewPost($domain, $session);
                 $new_post->processPost();
 
                 $redirect = new \Nelliel\Redirect();
@@ -239,8 +248,9 @@ function nel_module_dispatch(array $inputs, Domain $domain)
 
         case 'regen':
             $regen = new \Nelliel\Regen();
+            $session->init(true);
             $session->loggedInOrError();
-            $user = $session->sessionUser();
+            $user = $session->user();
             $forward = 'site';
             $board_id = $_GET['board-id'] ?? '';
 
@@ -251,7 +261,7 @@ function nel_module_dispatch(array $inputs, Domain $domain)
                     case 'board-all-pages':
                         if (!$user->checkPermission($domain, 'perm_regen_pages'))
                         {
-                            nel_derp(410, _gettext('You are not allowed to regenerate board pages.'));
+                            nel_derp(550, _gettext('You are not allowed to regenerate board pages.'));
                         }
 
                         $regen->allBoardPages($domain);
@@ -263,7 +273,7 @@ function nel_module_dispatch(array $inputs, Domain $domain)
                     case 'board-all-caches':
                         if (!$user->checkPermission($domain, 'perm_regen_cache'))
                         {
-                            nel_derp(411, _gettext('You are not allowed to regenerate board caches.'));
+                            nel_derp(551, _gettext('You are not allowed to regenerate board caches.'));
                         }
 
                         $domain->regenCache();
@@ -273,7 +283,7 @@ function nel_module_dispatch(array $inputs, Domain $domain)
                     case 'site-all-caches':
                         if (!$user->checkPermission($domain, 'perm_regen_cache'))
                         {
-                            nel_derp(412, _gettext('You are not allowed to regenerate site caches.'));
+                            nel_derp(552, _gettext('You are not allowed to regenerate site caches.'));
                         }
 
                         $domain->regenCache();
@@ -283,7 +293,7 @@ function nel_module_dispatch(array $inputs, Domain $domain)
                     case 'overboard-all-pages':
                         if (!$user->checkPermission($domain, 'perm_regen_pages'))
                         {
-                            nel_derp(413, _gettext('You are not allowed to regenerate overboard pages.'));
+                            nel_derp(553, _gettext('You are not allowed to regenerate overboard pages.'));
                         }
 
                         $regen->overboard($domain);
@@ -295,12 +305,12 @@ function nel_module_dispatch(array $inputs, Domain $domain)
             if ($forward === 'site')
             {
                 $output_main_panel = new \Nelliel\Render\OutputPanelMain($domain, false);
-                $output_main_panel->render(['user' => $session->sessionUser()], false);
+                $output_main_panel->render(['user' => $user], false);
             }
             else if ($forward === 'board')
             {
                 $output_board_panel = new \Nelliel\Render\OutputPanelBoard($domain, false);
-                $output_board_panel->render(['user' => $session->sessionUser(), 'board_id' => $board_id], false);
+                $output_board_panel->render(['user' => $user, 'board_id' => $board_id], false);
             }
 
             break;

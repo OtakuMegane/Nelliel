@@ -12,6 +12,7 @@ use Nelliel\Cites;
 use Nelliel\Moar;
 use Nelliel\Auth\Authorization;
 use Nelliel\Domains\Domain;
+use Nelliel\Render\OutputPost;
 use PDO;
 
 class ContentPost extends ContentHandler
@@ -20,30 +21,18 @@ class ContentPost extends ContentHandler
     protected $content_table;
     protected $src_path;
     protected $preview_path;
-    protected $archived;
     protected $archive_prune;
 
-    function __construct(ContentID $content_id, Domain $domain, bool $archived = false)
+    function __construct(ContentID $content_id, Domain $domain)
     {
         $this->database = $domain->database();
         $this->content_id = $content_id;
         $this->domain = $domain;
-        $this->archived = $archived;
         $this->authorization = new Authorization($this->database);
         $this->posts_table = $this->domain->reference('posts_table');
         $this->content_table = $this->domain->reference('content_table');
-
-        if ($archived)
-        {
-            $this->src_path = $this->domain->reference('archive_src_path');
-            $this->preview_path = $this->domain->reference('archive_preview_path');
-        }
-        else
-        {
-            $this->src_path = $this->domain->reference('src_path');
-            $this->preview_path = $this->domain->reference('preview_path');
-        }
-
+        $this->src_path = $this->domain->reference('src_path');
+        $this->preview_path = $this->domain->reference('preview_path');
         $this->archive_prune = new ArchiveAndPrune($this->domain, nel_utilities()->fileHandler());
         $this->storeMoar(new Moar());
     }
@@ -158,6 +147,30 @@ class ContentPost extends ContentHandler
                 NEL_DIRECTORY_PERM);
     }
 
+    public function addCites()
+    {
+        $cites = new Cites($this->database);
+
+        if (nel_true_empty($this->content_data['comment']))
+        {
+            return;
+        }
+
+        $cite_list = $cites->getCitesFromText($this->content_data['comment']);
+
+        foreach ($cite_list as $cite)
+        {
+            $cite_data = $cites->getCiteData($cite, $this->domain, $this->content_id);
+
+            if ($cite_data['exists'])
+            {
+                $cites->addCite($cite_data);
+            }
+        }
+
+        $cites->updateForPost($this);
+    }
+
     public function remove(bool $perm_override = false)
     {
         if (!$perm_override)
@@ -169,13 +182,22 @@ class ContentPost extends ContentHandler
 
             if ($this->domain->reference('locked'))
             {
-                nel_derp(52, _gettext('Cannot remove post. Board is locked.'));
+                nel_derp(62, _gettext('Cannot remove post. Board is locked.'));
+            }
+
+            $delete_renzoku = $this->domain->setting('delete_content_renzoku');
+
+            if ($delete_renzoku > 0 && time() - $this->content_data['post_time'] < $delete_renzoku)
+            {
+                nel_derp(64,
+                        sprintf(_gettext('You must wait %d seconds after making a post before it can be deleted.'),
+                                $delete_renzoku));
             }
         }
 
         $this->removeFromDatabase();
         $this->removeFromDisk();
-        $thread = new ContentThread($this->content_id, $this->domain, $this->archived);
+        $thread = new ContentThread($this->content_id, $this->domain);
 
         // TODO: This is a (hopefully) temporary thing to keep normal imageboard function when deleting OP post
         if ($thread->postCount() <= 0 || $this->content_id->threadID() == $this->content_id->postID())
@@ -201,7 +223,8 @@ class ContentPost extends ContentHandler
         $prepared = $this->database->prepare('DELETE FROM "' . $this->posts_table . '" WHERE "post_number" = ?');
         $this->database->executePrepared($prepared, [$this->content_id->postID()]);
         $cites = new Cites($this->database);
-        $cites->removeForPost($this->domain, $this->content_id);
+        $cites->updateForPost($this);
+        $cites->removeForPost($this);
         return true;
     }
 
@@ -228,7 +251,7 @@ class ContentPost extends ContentHandler
     protected function verifyModifyPerms()
     {
         $session = new \Nelliel\Account\Session();
-        $user = $session->sessionUser();
+        $user = $session->user();
 
         if (empty($this->content_data))
         {
@@ -260,14 +283,22 @@ class ContentPost extends ContentHandler
         if (!$flag)
         {
             if (!isset($this->content_data['post_password']) ||
-                    !nel_verify_salted_hash(NEL_POST_PASSWORD_PEPPER . $update_sekrit,
-                            $this->content_data['post_password']) || !$this->domain->setting('user_delete_own'))
+                    !hash_equals($this->content_data['post_password'], nel_post_password_hash($update_sekrit)) ||
+                    !$this->domain->setting('user_delete_own'))
             {
-                nel_derp(50, _gettext('Password is wrong or you are not allowed to delete that.'));
+                nel_derp(60, _gettext('Password is wrong or you are not allowed to delete that.'));
             }
         }
 
         return true;
+    }
+
+    public function getParent()
+    {
+        $content_id = new \Nelliel\Content\ContentID();
+        $content_id->changeThreadID($this->content_id->threadID());
+        $parent_thread = new ContentThread($content_id, $this->domain);
+        return $parent_thread;
     }
 
     public function convertToThread()
@@ -278,8 +309,6 @@ class ContentPost extends ContentHandler
         $new_content_id->changePostID($this->content_id->postID());
         $new_thread = new ContentThread($new_content_id, $this->domain);
         $new_thread->content_data['thread_id'] = $this->content_id->postID();
-        $new_thread->content_data['first_post'] = $this->content_id->postID();
-        $new_thread->content_data['last_post'] = $this->content_id->postID();
         $new_thread->content_data['last_bump_time'] = $time['time'];
         $new_thread->content_data['last_bump_time_milli'] = $time['milli'];
         $new_thread->content_data['last_update'] = $time['time'];
@@ -310,15 +339,36 @@ class ContentPost extends ContentHandler
         return $new_thread;
     }
 
-    public function isArchived()
-    {
-        return $this->archived;
-    }
-
     public function sticky()
     {
         $new_thread = $this->convertToThread();
         $new_thread->sticky();
         return $new_thread;
+    }
+
+    public function getCache(): array
+    {
+        $prepared = $this->database->prepare('SELECT "cache" FROM "' . $this->posts_table . '" WHERE "post_number" = ?');
+        $cache = $this->database->executePreparedFetch($prepared, [$this->content_data['post_number']],
+                PDO::FETCH_COLUMN);
+
+        if (is_string($cache))
+        {
+            return json_decode($cache, true);
+        }
+
+        return array();
+    }
+
+    public function storeCache(): void
+    {
+        $cache_array = array();
+        $output_post = new OutputPost($this->domain, false);
+        $cache_array['comment_data'] = $output_post->parseComment($this->content_data['comment'], $this->content_id);
+        $cache_array['backlink_data'] = $output_post->generateBacklinks($this);
+        $encoded_cache = json_encode($cache_array, JSON_UNESCAPED_UNICODE);
+        $prepared = $this->database->prepare(
+                'UPDATE "' . $this->posts_table . '" SET "cache" = ?, "regen_cache" = 0 WHERE "post_number" = ?');
+        $this->database->executePrepared($prepared, [$encoded_cache, $this->content_id->postID()]);
     }
 }

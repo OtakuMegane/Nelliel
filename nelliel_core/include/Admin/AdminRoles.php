@@ -8,15 +8,16 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminRoles extends Admin
 {
     private $role_id;
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
         $this->role_id = $_GET['role-id'] ?? null;
 
         if (!is_null($this->role_id) && !$this->authorization->roleExists($this->role_id))
@@ -42,11 +43,7 @@ class AdminRoles extends Admin
 
     public function add()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_roles'))
-        {
-            nel_derp(311, _gettext('You are not allowed to add roles.'));
-        }
-
+        $this->verifyAction();
         $this->role_id = $_POST['role_id'];
         $this->update();
         $this->outputMain(true);
@@ -62,11 +59,7 @@ class AdminRoles extends Admin
 
     public function update()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_roles'))
-        {
-            nel_derp(312, _gettext('You are not allowed to modify roles.'));
-        }
-
+        $this->verifyAction();
         $role = $this->authorization->newRole($this->role_id);
         $role->setupNew();
 
@@ -93,20 +86,39 @@ class AdminRoles extends Admin
 
     public function remove()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_roles'))
-        {
-            nel_derp(313, _gettext('You are not allowed to remove roles.'));
-        }
-
+        $this->verifyAction();
         $this->authorization->removeRole($this->role_id);
         $this->outputMain(true);
     }
 
-    private function verifyAccess()
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_roles'))
         {
-            nel_derp(310, _gettext('You are not allowed to access the roles panel.'));
+            nel_derp(310, _gettext('You do not have access to the Roles panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_roles'))
+        {
+            nel_derp(311, _gettext('You are not allowed to manage roles.'));
         }
     }
 }

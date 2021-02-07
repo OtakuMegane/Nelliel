@@ -16,6 +16,7 @@ abstract class Output
     protected $site_domain;
     protected $database;
     protected $render_core;
+    protected $render_data = array();
     protected static $render_cores = array();
     protected $file_handler;
     protected $output_filter;
@@ -25,6 +26,7 @@ abstract class Output
     protected $template_substitutes;
     protected $session;
     protected $default_body_template = 'empty_body';
+    protected $timer;
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -32,11 +34,22 @@ abstract class Output
         $this->write_mode = $write_mode;
         $this->database = $domain->database();
         $this->selectRenderCore('mustache');
-        $this->site_domain = new \Nelliel\Domains\DomainSite(nel_database());
+        $this->site_domain = nel_site_domain();
         $this->file_handler = nel_utilities()->fileHandler();
         $this->output_filter = new Filter();
         $this->template_substitutes = new TemplateSubstitutes();
         $this->session = new \Nelliel\Account\Session();
+
+        if($this->session->modmodeRequested())
+        {
+            $this->session->init(true);
+        }
+    }
+
+    protected function renderSetup()
+    {
+        $this->render_data = array();
+        $this->render_data['page_language'] = $this->domain->locale();
     }
 
     protected function selectRenderCore(string $core_id)
@@ -59,26 +72,25 @@ abstract class Output
         $this->core_id = $core_id;
     }
 
-    protected function timerTotalFunction(Timer $timer, bool $rounded = true, int $precision = 4)
+    protected function timerTotalFunction(bool $rounded = true, int $precision = 4)
     {
-        return function () use ($timer, $rounded, $precision)
+        return function () use ($rounded, $precision)
         {
-            return $timer->elapsed($rounded, $precision);
+            return $this->timer->elapsed($rounded, $precision);
         };
     }
 
-    protected function setupTimer(Domain $domain, array &$render_data)
+    protected function setupTimer(bool $rounded = true, int $precision = 4)
     {
-        if ($domain->setting('display_render_timer'))
+        if ($this->domain->setting('display_render_timer'))
         {
-            $timer = new Timer();
-            $timer->start();
-            $render_data['show_stats']['render_timer'] = $this->timerTotalFunction($timer);
+            $this->timer = new Timer();
+            $this->timer->start();
+            $this->render_data['show_stats']['render_timer'] = $this->timerTotalFunction($rounded, $precision);
         }
     }
 
-    protected function output(string $template, bool $data_only, bool $translate, array $render_data = array(),
-            $dom = null)
+    protected function output(string $template, bool $data_only, bool $translate, array $render_data, $dom = null)
     {
         $output = null;
         $substitutes = $this->template_substitutes->getAll();

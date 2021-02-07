@@ -12,7 +12,6 @@ use PDO;
 
 class OutputNews extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -21,9 +20,8 @@ class OutputNews extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('news');
         $output_head = new OutputHead($this->domain, $this->write_mode);
         $this->render_data['head'] = $output_head->render([], true);
@@ -65,7 +63,7 @@ class OutputNews extends Output
             }
 
             $entry_list[] = $news_info;
-            ++ $limit_counter;
+            $limit_counter ++;
         }
 
         return $entry_list;

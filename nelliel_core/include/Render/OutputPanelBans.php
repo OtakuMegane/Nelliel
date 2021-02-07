@@ -13,7 +13,6 @@ use Nelliel\Domains\Domain;
 
 class OutputPanelBans extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -22,9 +21,8 @@ class OutputPanelBans extends Output
 
     public function main(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/bans_main');
         $parameters['is_panel'] = true;
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Bans');
@@ -33,7 +31,7 @@ class OutputPanelBans extends Output
         $this->render_data['head'] = $output_head->render([], true);
         $output_header = new OutputHeader($this->domain, $this->write_mode);
         $this->render_data['header'] = $output_header->manage($parameters, true);
-        $this->render_data['can_modify'] = $this->session->sessionUser()->checkPermission($this->domain, 'perm_manage_bans');
+        $this->render_data['can_modify'] = $this->session->user()->checkPermission($this->domain, 'perm_manage_bans');
         $bans_access = new BansAccess($this->database);
 
         if ($this->domain->id() !== Domain::SITE)
@@ -59,7 +57,6 @@ class OutputPanelBans extends Output
             $ban_data['bgclass'] = $bgclass;
             $bgclass = ($bgclass === 'row1') ? 'row2' : 'row1';
             $ban_data['ban_id'] = $ban_hammer->getData('ban_id');
-            $ban_data['ban_type'] = $ban_hammer->getData('ban_type');
             $ban_data['ip_address'] = $this->formatIP($ban_hammer) ?? nel_truncate_hash(
                     $ban_hammer->getData('hashed_ip_address'));
             $ban_data['board_id'] = $ban_hammer->getData('board_id');
@@ -90,10 +87,8 @@ class OutputPanelBans extends Output
 
     public function new(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
-        $this->setBodyTemplate('panels/bans_add');
+        $this->renderSetup();
+        $this->setBodyTemplate('panels/bans_new');
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Bans');
         $parameters['section'] = $parameters['section'] ?? _gettext('New Ban');
         $output_head = new OutputHead($this->domain, $this->write_mode);
@@ -106,11 +101,7 @@ class OutputPanelBans extends Output
             $this->render_data['ban_board'] = $this->domain->id();
         }
 
-        $this->render_data['ban_ip'] = $parameters['ip_start'];
-        $this->render_data['ban_hashed_ip'] = $parameters['hashed_ip'];
-        $this->render_data['ban_type'] = $parameters['ban_type'];
-        $this->render_data['content_ban'] = $this->render_data['ban_type'] === 'CONTENT';
-        $this->render_data['unhashed_ip'] = nel_site_domain()->setting('store_unhashed_ip');
+        $this->render_data['ban_ip'] = $parameters['ban_ip'];
         $this->render_data['form_action'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                 http_build_query(
                         ['module' => 'admin', 'section' => 'bans', 'actions' => 'add',
@@ -124,9 +115,7 @@ class OutputPanelBans extends Output
 
     public function modify(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
         $this->setBodyTemplate('panels/bans_modify');
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Bans');
         $parameters['section'] = $parameters['section'] ?? _gettext('Modify Ban');
@@ -139,15 +128,20 @@ class OutputPanelBans extends Output
                         ['module' => 'admin', 'section' => 'bans', 'actions' => 'update',
                             'board-id' => $this->domain->id()]);
         $ban_id = $_GET['ban_id'];
-        $this->render_data['view_unhashed_ip'] = $this->session->sessionUser()->checkPermission($this->domain,
-                'perm_view_unhashed_ip');
         $ban_hammer = new \Nelliel\BanHammer($this->database);
         $ban_hammer->loadFromID($ban_id);
-        $this->render_data['ip_address'] = $this->formatIP($ban_hammer);
+
+        if ($this->session->user()->checkPermission($this->domain, 'perm_view_unhashed_ip'))
+        {
+            $this->render_data['ban_ip'] = $this->formatIP($ban_hammer);
+        }
+        else
+        {
+            $this->render_data['ban_ip'] = $ban_hammer->getData('hashed_ip_address');
+        }
+
         $this->render_data['ban_id'] = $ban_hammer->getData('ban_id');
-        $this->render_data['hashed_ip'] = $ban_hammer->getData('hashed_ip_address');
         $this->render_data['ban_board'] = $ban_hammer->getData('board_id');
-        $this->render_data['ban_type'] = $ban_hammer->getData('ban_type');
         $this->render_data['start_time_formatted'] = date("D F jS Y  H:i:s", $ban_hammer->getData('start_time'));
         $this->render_data['expiration'] = date("D F jS Y  H:i:s",
                 $ban_hammer->getData('length') + $ban_hammer->getData('start_time'));
@@ -182,6 +176,10 @@ class OutputPanelBans extends Output
             {
                 $ip_address .= ' - ' . $ban_hammer->getData('ip_address_end');
             }
+        }
+        else
+        {
+            $ip_address = $ban_hammer->getData('hashed_ip_address');
         }
 
         return $ip_address;

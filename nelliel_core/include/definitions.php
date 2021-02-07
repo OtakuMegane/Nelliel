@@ -17,16 +17,6 @@ define('NEL_FONTS_DIR', 'fonts');
 define('NEL_GENERAL_DIR', '.nelliel');
 define('NEL_CAPTCHA_DIR', 'captchas');
 
-// TODO: Currently unused, possibly remove
-if ($_SERVER['SERVER_PORT'] != 80 && empty($_SERVER['HTTPS']))
-{
-    define('NEL_BASE_DOMAIN', $_SERVER['SERVER_NAME'] . ':' . $_SERVER['SERVER_PORT']);
-}
-else
-{
-    define('NEL_BASE_DOMAIN', $_SERVER['SERVER_NAME']);
-}
-
 define('NEL_MAIN_SCRIPT', 'imgboard.php');
 define('NEL_MAIN_SCRIPT_QUERY', 'imgboard.php?');
 define('NEL_MAIN_INDEX', 'index');
@@ -39,12 +29,15 @@ define('NEL_BOARD_DATA_TABLE', 'nelliel_board_data');
 define('NEL_BOARD_DEFAULTS_TABLE', 'nelliel_board_defaults');
 define('NEL_CAPTCHA_TABLE', 'nelliel_captcha');
 define('NEL_CITES_TABLE', 'nelliel_cites');
+define('NEL_EMBEDS_TABLE', 'nelliel_embeds');
 define('NEL_FILES_FILTERS_TABLE', 'nelliel_file_filters');
 define('NEL_FILETYPES_TABLE', 'nelliel_filetypes');
+define('NEL_IF_THENS_TABLE', 'nelliel_if_thens');
 define('NEL_LOGS_TABLE', 'nelliel_logs');
 define('NEL_NEWS_TABLE', 'nelliel_news');
 define('NEL_PERMISSIONS_TABLE', 'nelliel_permissions');
 define('NEL_PLUGINS_TABLE', 'nelliel_plugins');
+define('NEL_PMS_TABLE', 'nelliel_pms');
 define('NEL_OVERBOARD_TABLE', 'nelliel_overboard');
 define('NEL_RATE_LIMIT_TABLE', 'nelliel_rate_limit');
 define('NEL_REPORTS_TABLE', 'nelliel_reports');
@@ -52,6 +45,7 @@ define('NEL_ROLE_PERMISSIONS_TABLE', 'nelliel_role_permissions');
 define('NEL_ROLES_TABLE', 'nelliel_roles');
 define('NEL_SETTINGS_TABLE', 'nelliel_settings');
 define('NEL_SITE_CONFIG_TABLE', 'nelliel_site_config');
+define('NEL_STAFF_BOARD_TABLE', 'nelliel_staff_board');
 define('NEL_TEMPLATES_TABLE', 'nelliel_templates');
 define('NEL_USER_ROLES_TABLE', 'nelliel_user_roles');
 define('NEL_USERS_TABLE', 'nelliel_users');
@@ -72,7 +66,20 @@ define('NEL_WAT_FILES_PATH', NEL_INCLUDE_PATH . 'wat/');
 define('NEL_GENERAL_FILES_PATH', NEL_BASE_PATH . NEL_GENERAL_DIR . '/');
 define('NEL_CAPTCHA_FILES_PATH', NEL_GENERAL_FILES_PATH . NEL_CAPTCHA_DIR . '/');
 
-define('NEL_BASE_WEB_PATH', pathinfo($_SERVER['PHP_SELF'], PATHINFO_DIRNAME) . '/');
+$dirname = pathinfo($_SERVER['PHP_SELF'], PATHINFO_DIRNAME);
+
+// When running at web root $dirname would result in // which has special meaning and all the URLs are fucked
+if($dirname === '/')
+{
+    define('NEL_BASE_WEB_PATH', '/');
+}
+else
+{
+    define('NEL_BASE_WEB_PATH', $dirname . '/');
+}
+
+unset($dirname);
+
 define('NEL_ASSETS_WEB_PATH', NEL_BASE_WEB_PATH . NEL_ASSETS_DIR . '/');
 define('NEL_SCRIPTS_WEB_PATH', NEL_ASSETS_WEB_PATH . NEL_SCRIPTS_DIR . '/');
 define('NEL_IMAGES_WEB_PATH', NEL_ASSETS_WEB_PATH . NEL_IMAGES_DIR . '/');

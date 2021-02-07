@@ -12,14 +12,14 @@ NOTE: This API is **not** directly compatible with other imageboard APIs.
 Contains a representation of boards present on the site.
 
 ### Index
-**Location:** http(s)://`:site_url`/`:board_directory`/index-`:index_number`.json
+**Location:** http(s)://`:site_url`/`:board_directory`/index`:index_number`.json
 
-NOTE: For index pages, `:index_number` starts at 1.
+NOTE: For index pages the first will be `index` without a number.
 
 Contains a representation of the specified index page.
 
 ### Thread
-**Location:** http(s)://`:site_url`/`:board_directory`/threads/`:thread_id`/thread-`:thread_id`.json
+**Location:** http(s)://`:site_url`/`:board_directory`/threads/`:thread_id`/`:thread_id`.json
 
 Contains a representation of the specified thread.
 
@@ -40,18 +40,16 @@ Contains a list of boards and their basic information. Contains one `cooldowns` 
 |:-----------------------|:--------|:--------------|:----------|
 |`board_id`              |`string` |text           |ID of the board.|
 |`name`                  |`string` |text           |Displayed name of the board.|
-|`slogan`                |`string` |text           |Slogan/subtitle for the board.|
 |`description`           |`string` |text           |Short description of the board.|
 |`language`              |`string` |text           |Language code for the board default.|
 |`forced_anonymous`      |`boolean`|true or false  |Is forced anonymous posting enabled.|
 |`threads_per_page`      |`integer`|1-2147483647   |Maximum threads shown on each index page.|
-|`page_limit`            |`integer`|1-2147483647   |Maximum index pages available.|
 |`max_bumps`             |`integer`|1-2147483647   |Maximum times a thread can be bumped.|
 |`max_posts`             |`integer`|1-2147483647   |Maximum number of posts in a thread.|
 |`max_filesize`          |`integer`|1-2147483647   |Maximum size of uploaded files (in kilobytes).|
-|`require_content_start` |`boolean`|true or false  |Image, file or content required for new thread.|
-|`require_content_always`|`boolean`|true or false  |Image, file or content required for any post.|
-|`allow_tripkeys`        |`boolean`|true or false  |Are tripcodes allowed when posting.|
+|`require_op_upload`     |`boolean`|true or false  |Image, file or content required for new thread.|
+|`require_reply_upload`  |`boolean`|true or false  |Image, file or content required for replies.|
+|`allow_tripcodes`       |`boolean`|true or false  |Are tripcodes allowed when posting.|
 
 ### `cooldowns`
 Contains a list of cooldowns for posting on a board.
@@ -77,15 +75,13 @@ Contains information about a thread.
 |Attribute Key         |Type     |Possible Values      |Description|                               
 |:---------------------|:--------|:--------------------|:----------|
 |`thread_id`           |`integer`|0-2147483647         |ID of the thread.|
-|`first_post`          |`integer`|0-2147483647         |First post in the thread.|
-|`last_post`           |`integer`|0-2147483647         |Last post in the thread.|
 |`last_bump_time`      |`integer`|64-bit Unix timestamp|Last thread bump time.|
 |`last_bump_time_milli`|`integer`|0-999                |Last thread bump time milliseconds. Used with `last_bump_time` when high precision is needed.|
 |`last_update`         |`integer`|64-bit Unix timestamp|Last thread update.|
 |`last_update_milli`   |`integer`|0-999                |Last thread update milliseconds. Used with `last_update` when high precision is needed.|
 |`post_count`          |`integer`|0-2147483647         |Total number of posts in the thread.|
 |`content_count`       |`integer`|0-2147483647         |Total content in the thread.|
-|`thread_sage`         |`boolean`|true or false        |Is the thread permasaged.|
+|`permasage`           |`boolean`|true or false        |Is the thread permasaged.|
 |`sticky`              |`boolean`|true or false        |Is the thread stickied.|
 |`locked`              |`boolean`|true or false        |Is the thread locked.|
 

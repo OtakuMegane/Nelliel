@@ -190,6 +190,8 @@ class Setup
         $board_defaults_table = new TableBoardConfig($this->database, $this->sql_compatibility);
         $board_defaults_table->tableName(NEL_BOARD_DEFAULTS_TABLE);
         $board_defaults_table->createTable();
+        $embeds_table = new TableEmbeds($this->database, $this->sql_compatibility);
+        $embeds_table->createTable();
         $filetypes_table = new TableFiletypes($this->database, $this->sql_compatibility);
         $filetypes_table->createTable();
         $news_table = new TableNews($this->database, $this->sql_compatibility);
@@ -204,13 +206,19 @@ class Setup
         $templates_table->createTable();
         $plugins_table = new TablePlugins($this->database, $this->sql_compatibility);
         $plugins_table->createTable();
+        $staff_board_table = new TableStaffBoard($this->database, $this->sql_compatibility);
+        $staff_board_table->createTable();
+        $pms_table = new TablePMs($this->database, $this->sql_compatibility);
+        $pms_table->createTable();
 
         // NOTE: Tables must be created in order of:
-        // board data -> file filters -> overboard -> reports -> cites
+        // board data -> file filters -> if thens -> overboard -> reports -> cites
         $board_data_table = new TableBoardData($this->database, $this->sql_compatibility);
         $board_data_table->createTable();
         $file_filters_table = new TableFileFilters($this->database, $this->sql_compatibility);
         $file_filters_table->createTable(['board_data_table' => NEL_BOARD_DATA_TABLE]);
+        $if_thens_table = new TableIfThens($this->database, $this->sql_compatibility);
+        $if_thens_table->createTable(['board_data_table' => NEL_BOARD_DATA_TABLE]);
         $overboard_table = new TableOverboard($this->database, $this->sql_compatibility);
         $overboard_table->createTable(['board_data_table' => NEL_BOARD_DATA_TABLE]);
         $reports_table = new TableReports($this->database, $this->sql_compatibility);
@@ -265,9 +273,6 @@ class Setup
         $content_table = new TableContent($this->database, $this->sql_compatibility);
         $content_table->tableName($domain->reference('content_table'));
         $content_table->createTable(['posts_table' => $domain->reference('posts_table')]);
-        $content_table = new TableLogs($this->database, $this->sql_compatibility);
-        $content_table->tableName($domain->reference('log_table'));
-        $content_table->createTable();
     }
 
     public function createBoardDirectories(string $board_id)
@@ -277,10 +282,7 @@ class Setup
         $this->file_handler->createDirectory($references['src_path'], NEL_DIRECTORY_PERM, true);
         $this->file_handler->createDirectory($references['preview_path'], NEL_DIRECTORY_PERM, true);
         $this->file_handler->createDirectory($references['page_path'], NEL_DIRECTORY_PERM, true);
-        $this->file_handler->createDirectory($references['archive_path'], NEL_DIRECTORY_PERM, true);
-        $this->file_handler->createDirectory($references['archive_src_path'], NEL_DIRECTORY_PERM, true);
-        $this->file_handler->createDirectory($references['archive_preview_path'], NEL_DIRECTORY_PERM, true);
-        $this->file_handler->createDirectory($references['archive_page_path'], NEL_DIRECTORY_PERM, true);
+        $this->file_handler->createDirectory($references['banner_path'], NEL_DIRECTORY_PERM, true);
     }
 
     public function installCoreTemplates()

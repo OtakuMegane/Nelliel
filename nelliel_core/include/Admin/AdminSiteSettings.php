@@ -8,14 +8,15 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminSiteSettings extends Admin
 {
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
@@ -27,22 +28,22 @@ class AdminSiteSettings extends Admin
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
+        $this->verifyAction();
     }
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_site_config'))
-        {
-            nel_derp(361, _gettext('You are not allowed to modify the site settings.'));
-        }
+        $this->verifyAction();
 
         foreach ($_POST as $key => $value)
         {
@@ -62,13 +63,37 @@ class AdminSiteSettings extends Admin
 
     public function remove()
     {
+        $this->verifyAction();
     }
 
-    private function verifyAccess()
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
+    }
+
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_site_config'))
         {
-            nel_derp(360, _gettext('You are not allowed to access the site settings.'));
+            nel_derp(360, _gettext('You do not have access to the Site Settings panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_site_config'))
+        {
+            nel_derp(361, _gettext('You are not allowed to manage site settings.'));
         }
     }
 }

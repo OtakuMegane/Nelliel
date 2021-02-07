@@ -7,13 +7,14 @@ if (!defined('NELLIEL_VERSION'))
     die("NOPE.AVI");
 }
 
+use Nelliel\Cites;
 use Nelliel\Content\ContentID;
+use Nelliel\Content\ContentPost;
 use Nelliel\Domains\Domain;
 use PDO;
 
 class OutputPost extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -22,7 +23,7 @@ class OutputPost extends Output
 
     public function render(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
+        $this->renderSetup();
         $thread_data = $parameters['thread_data'] ?? array();
         $gen_data = $parameters['gen_data'] ?? array();
         $post_id = $parameters['post_id'] ?? 0;
@@ -34,36 +35,45 @@ class OutputPost extends Output
         $thread_content_id = new ContentID(ContentID::createIDString($post_data['parent_thread']));
         $post_content_id = new ContentID(
                 ContentID::createIDString($post_data['parent_thread'], $post_data['post_number']));
-        $web_paths['thread_page'] = $this->domain->reference('page_web_path') . $thread_content_id->threadID() .
-                '/thread-' . $thread_content_id->threadID() . '.html';
+        $post = new ContentPost($post_content_id, $this->domain);
+        $post->loadFromDatabase();
+
+        if (NEL_USE_RENDER_CACHE)
+        {
+            if ($post_data['regen_cache'])
+            {
+                $post->storeCache();
+                $post_data['render_cache'] = $post->getCache();
+            }
+            else
+            {
+                $post_data['render_cache'] = json_decode($post_data['cache'], true);
+            }
+        }
+
+        $thread_format = sprintf($this->site_domain->setting('thread_filename_format'), $thread_content_id->threadID());
+        $web_paths['thread_page'] = $this->domain->reference('page_web_path') . $thread_content_id->threadID() . '/' .
+                $thread_format . NEL_PAGE_EXT;
         $web_paths['thread_src'] = $this->domain->reference('src_web_path') . $thread_content_id->threadID() . '/';
         $web_paths['thread_preview'] = $this->domain->reference('preview_web_path') . $thread_content_id->threadID() .
                 '/';
         $this->render_data['post_corral_id'] = 'post-corral-' . $post_content_id->getIDString();
         $this->render_data['post_container_id'] = 'post-container-' . $post_content_id->getIDString();
-        $this->render_data['header_id'] = 'header-' . $post_content_id->getIDString();
-        $this->render_data['content_container_id'] = 'content-' . $post_content_id->getIDString();
-        $this->render_data['comments_id'] = 'post-comments-' . $post_content_id->getIDString();
 
         if ($response)
         {
-            $class_prefix = 'reply-';
+            $this->render_data['op_reply'] = 'reply';
             $this->render_data['indents_marker'] = $this->domain->setting('indent_marker');
         }
         else
         {
-            $class_prefix = 'op-';
+            $this->render_data['op_reply'] = 'op';
             $this->render_data['indents_marker'] = '';
         }
 
-        $this->render_data['post_container_class'] = $class_prefix . 'post';
-        $this->render_data['post_header_options_class'] = $class_prefix . 'post-header-options';
-        $this->render_data['post_header_info_class'] = $class_prefix . 'post-header-info';
-        $this->render_data['content_container_class'] = $class_prefix . 'content-container';
-        $this->render_data['post_disclaimer_class'] = $class_prefix . 'post-disclaimer';
         $this->render_data['post_anchor_id'] = 't' . $post_content_id->threadID() . 'p' . $post_content_id->postID();
         $this->render_data['headers'] = $this->postHeaders($response, $thread_data, $post_data, $thread_content_id,
-                $post_content_id, $web_paths, $gen_data, $in_thread_number);
+                $post, $web_paths, $gen_data, $in_thread_number);
 
         if ($post_data['has_content'] == 1)
         {
@@ -73,6 +83,7 @@ class OutputPost extends Output
             $file_list = $this->database->executePreparedFetchAll($prepared, [$post_data['post_number']],
                     PDO::FETCH_ASSOC);
             $output_file_info = new OutputFile($this->domain, $this->write_mode);
+            $output_embed_info = new OutputEmbed($this->domain, $this->write_mode);
             $content_row = array();
             $this->render_data['multi_file'] = count($file_list) > 1;
 
@@ -80,14 +91,25 @@ class OutputPost extends Output
             {
                 $json_content = new \Nelliel\API\JSON\JSONContent($this->domain, $this->file_handler);
                 $parameters['json_instances']['content'] = $json_content;
-                $file_data = $output_file_info->render(
-                        ['file_data' => $file, 'content_order' => $file['content_order'], 'post_data' => $post_data,
-                            'web_paths' => $web_paths, 'json_instances' => $parameters['json_instances']], true);
+
+                if (nel_true_empty($file['embed_url']))
+                {
+                    $file_data = $output_file_info->render(
+                            ['file_data' => $file, 'content_order' => $file['content_order'], 'post_data' => $post_data,
+                                'web_paths' => $web_paths, 'json_instances' => $parameters['json_instances']], true);
+                }
+                else
+                {
+                    $file_data = $output_embed_info->render(
+                            ['file_data' => $file, 'content_order' => $file['content_order'], 'post_data' => $post_data,
+                                'web_paths' => $web_paths, 'json_instances' => $parameters['json_instances']], true);
+                }
+
                 $content_row[]['content_data'] = $file_data;
 
                 if ($this->render_data['multi_file'])
                 {
-                    if (count($content_row) == $this->domain->setting('max_files_row'))
+                    if (count($content_row) == $this->domain->setting('max_uploads_row'))
                     {
                         $this->render_data['content_rows'][]['row'] = $content_row;
                         $content_row = array();
@@ -106,7 +128,8 @@ class OutputPost extends Output
         }
 
         $this->render_data['post_comments'] = $this->postComments($post_data, $post_content_id, $gen_data, $web_paths);
-        $this->render_data['content_disclaimer'] = nel_site_domain()->setting('content_disclaimer');
+        $this->render_data['site_content_disclaimer'] = nel_site_domain()->setting('site_content_disclaimer');
+        $this->render_data['board_content_disclaimer'] = $this->domain->setting('board_content_disclaimer');
         $output = $this->output('thread/post', $data_only, true, $this->render_data);
         return $output;
     }
@@ -126,19 +149,18 @@ class OutputPost extends Output
     }
 
     private function postHeaders(bool $response, array $thread_data, array $post_data, ContentID $thread_content_id,
-            ContentID $post_content_id, array $web_paths, array $gen_data, int $in_thread_number)
+            ContentPost $post, array $web_paths, array $gen_data, int $in_thread_number)
     {
         $header_data = array();
         $modmode_headers = array();
         $thread_headers = array();
         $authorization = new \Nelliel\Auth\Authorization($this->database);
-        $session = new \Nelliel\Account\Session();
-        $cites = new \Nelliel\Cites($this->domain->database());
         $header_data['response'] = $response;
+        $post_content_id = $post->contentID();
 
-        if ($session->inModmode($this->domain) && !$this->write_mode)
+        if ($this->session->inModmode($this->domain) && !$this->write_mode)
         {
-            if ($this->session->sessionUser()->checkPermission($this->domain, 'perm_view_unhashed_ip') &&
+            if ($this->session->user()->checkPermission($this->domain, 'perm_view_unhashed_ip') &&
                     !empty($post_data['ip_address']))
             {
                 $ip = @inet_ntop($post_data['ip_address']);
@@ -158,33 +180,36 @@ class OutputPost extends Output
             else
             {
                 $temp_content_id = $thread_content_id;
-                $locked = ($thread_data['locked'] == 1);
-                $modmode_headers['lock_text'] = ($locked) ? _gettext('Unlock Thread') : _gettext('Lock Thread');
-                $lock_action = ($locked) ? 'unlock' : 'lock';
+                $locked = $thread_data['locked'] == 1;
+                $modmode_headers['lock_text'] = ($locked) ? _gettext('Unlock') : _gettext('Lock');
                 $modmode_headers['lock_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
-                        '&actions=' . $lock_action . '&content-id=' . $thread_content_id->getIDString() .
-                        '&modmode=true&goback=true';
-                $sticky = ($thread_data['sticky'] == 1);
-                $modmode_headers['sticky_text'] = ($sticky) ? _gettext('Unsticky Thread') : _gettext('Sticky Thread');
-                $sticky_action = ($sticky) ? 'unsticky' : 'sticky';
+                        '&actions=lock&content-id=' . $thread_content_id->getIDString() . '&modmode=true&goback=true';
+                $sticky = $thread_data['sticky'] == 1;
+                $modmode_headers['sticky_text'] = ($sticky) ? _gettext('Unsticky') : _gettext('Sticky');
                 $modmode_headers['sticky_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
-                        '&actions=' . $sticky_action . '&content-id=' . $thread_content_id->getIDString() .
-                        '&modmode=true&goback=true';
+                        '&actions=sticky&content-id=' . $thread_content_id->getIDString() . '&modmode=true&goback=true';
+                $permasage = $thread_data['permasage'] == 1;
+                $modmode_headers['permasage_text'] = ($permasage) ? _gettext('Unsage') : _gettext('Sage');
+                $modmode_headers['permasage_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
+                        '&actions=sage&content-id=' . $thread_content_id->getIDString() . '&modmode=true&goback=true';
+                $cyclic = $thread_data['cyclic'] == 1;
+                $modmode_headers['cyclic_text'] = ($cyclic) ? _gettext('Non-cyclic') : _gettext('Cyclic');
+                $modmode_headers['cyclic_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
+                        '&actions=cyclic&content-id=' . $thread_content_id->getIDString() . '&modmode=true&goback=true';
             }
 
             $modmode_headers['ban_url'] = '?module=admin&section=bans&board-id=' . $this->domain->id() .
-                    '&actions=new&content-id=' . $post_content_id->getIDString() . '&modmode=true&goback=false';
+                    '&actions=new&ban-ip=' . $ip . '&modmode=true&goback=false';
             $modmode_headers['delete_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
                     '&actions=delete&content-id=' . $temp_content_id->getIDString() . '&modmode=true&goback=true';
             $modmode_headers['ban_delete_url'] = '?module=admin&section=threads&board-id=' . $this->domain->id() .
-                    '&actions=bandelete&content-id=' . $post_content_id->getIDString() . '&modmode=true&goback=false';
+                    '&actions=bandelete&content-id=' . $post_content_id->getIDString() . '&ban-ip=' . $ip .
+                    '&modmode=true&goback=false';
             $header_data['modmode_headers'] = $modmode_headers;
         }
 
         if (!$response)
         {
-            $class_prefix = 'op-';
-            $thread_headers['hide_thread_id'] = 'hide-thread-' . $thread_content_id->getIDString();
             $thread_headers['thread_content_id'] = $thread_content_id->getIDString();
             $thread_headers['post_content_id'] = $post_content_id->getIDString();
             $thread_headers['sticky'] = $thread_data['sticky'];
@@ -202,7 +227,7 @@ class OutputPost extends Output
 
             $thread_headers['reply_to_url'] = $web_paths['thread_page'];
 
-            if ($session->inModmode($this->domain) && !$this->write_mode)
+            if ($this->session->inModmode($this->domain) && !$this->write_mode)
             {
                 $thread_headers['render'] = '-render';
                 $thread_headers['reply_to_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
@@ -212,21 +237,9 @@ class OutputPost extends Output
 
             $header_data['thread_headers'] = $thread_headers;
         }
-        else
-        {
-            $class_prefix = 'reply-';
-        }
 
         $post_headers['in_thread_number'] = $in_thread_number;
         $post_headers['post_content_id'] = $post_content_id->getIDString();
-        $post_headers['hide_post_id'] = 'hide-post-' . $post_content_id->getIDString();
-        $post_headers['post_header_info_id'] = 'post-header-info-' . $post_content_id->getIDString();
-        $post_headers['post_header_options_id'] = 'post-header-options-' . $post_content_id->getIDString();
-        $post_headers['header_info_class'] = $class_prefix . 'post-header-info';
-        $post_headers['subject_class'] = $class_prefix . 'subject';
-        $post_headers['poster_name_class'] = $class_prefix . 'poster-name';
-        $post_headers['tripline_class'] = $class_prefix . 'trip-line';
-        $post_headers['post_link_class'] = $class_prefix . 'post-link';
 
         if (!nel_true_empty($post_data['email']))
         {
@@ -252,9 +265,9 @@ class OutputPost extends Output
             }
         }
 
-        $tripcode = (!empty($post_data['tripcode'])) ? $this->domain->setting('tripkey_marker') . $post_data['tripcode'] : '';
-        $secure_tripcode = (!empty($post_data['secure_tripcode'])) ? $this->domain->setting('tripkey_marker') .
-                $this->domain->setting('tripkey_marker') . $post_data['secure_tripcode'] : '';
+        $tripcode = (!empty($post_data['tripcode'])) ? $this->domain->setting('tripcode_marker') . $post_data['tripcode'] : '';
+        $secure_tripcode = (!empty($post_data['secure_tripcode'])) ? $this->domain->setting('tripcode_marker') .
+                $this->domain->setting('tripcode_marker') . $post_data['secure_tripcode'] : '';
         $capcode = ($post_data['mod_post_id']) ? $authorization->getRole($post_data['mod_post_id'])->auth_data['capcode'] : '';
         $trip_line = $tripcode . $secure_tripcode;
         $post_headers['tripline'] = $trip_line;
@@ -266,31 +279,13 @@ class OutputPost extends Output
 
         if ($this->domain->setting('display_post_backlinks'))
         {
-            $prepared = $this->database->prepare(
-                    'SELECT * FROM "' . NEL_CITES_TABLE . '" WHERE "target_board" = ? AND "target_post" = ?');
-            $cite_list = $this->database->executePreparedFetchAll($prepared,
-                    [$this->domain->id(), $post_content_id->postID()], PDO::FETCH_ASSOC);
-
-            foreach ($cite_list as $cite)
+            if (NEL_USE_RENDER_CACHE && isset($post_data['render_cache']['backlink_data']))
             {
-                $backlink_data = array();
-
-                if ($cite['source_board'] == $this->domain->id())
-                {
-                    $backlink_data['backlink_text'] = '>>' . $cite['source_post'];
-                }
-                else
-                {
-                    $backlink_data['backlink_text'] = '>>>/' . $cite['source_board'] . '/' . $cite['source_post'];
-                }
-
-                $link_url = $cites->createPostLinkURL($this->domain, $post_content_id, $backlink_data['backlink_text']);
-
-                if (!empty($link_url))
-                {
-                    $backlink_data['backlink_url'] = $link_url;
-                    $post_headers['backlinks'][] = $backlink_data;
-                }
+                $post_headers['backlinks'] = $post_data['render_cache']['backlink_data'];
+            }
+            else
+            {
+                $post_headers['backlinks'] = $this->generateBacklinks($post);
             }
         }
 
@@ -300,17 +295,11 @@ class OutputPost extends Output
 
     private function postComments(array $post_data, ContentID $post_content_id, array $gen_data, array $web_paths)
     {
-        $cite_match_regex = '#^\s*>>#';
-        $greentext_regex = '#^\s*>[^>]#';
-        $url_protocols = $this->domain->setting('url_protocols');
-        $url_split_regex = '#(' . $url_protocols . ')(:\/\/)#';
-        $line_split_regex = '#(>>[0-9]+)|(>>>\/.+\/[0-9]+)|(\s)#';
         $comment_data = array();
-        $post_type_class = $post_data['op'] == 1 ? 'op-' : 'reply-';
         $comment_data['post_contents_id'] = 'post-contents-' . $post_content_id->getIDString();
-        $comment_data['comments_class'] = $post_type_class . 'post-comments';
         $comment_data['mod_comment'] = $post_data['mod_comment'] ?? null;
         $comment_data['noreferrer_nofollow'] = $this->site_domain->setting('noreferrer_nofollow');
+        $post_data['comment'] = trim($post_data['comment']);
 
         if (nel_true_empty($post_data['comment']))
         {
@@ -318,91 +307,39 @@ class OutputPost extends Output
         }
         else
         {
-            $cites = new \Nelliel\Cites($this->database);
-            $post_data['comment'] = trim($post_data['comment']);
-
             if ($this->domain->setting('filter_combining_characters'))
             {
                 $post_data['comment'] = $this->output_filter->filterUnicodeCombiningCharacters($post_data['comment']);
             }
 
-            $cite_total = 0;
-            $cite_link_max = $this->domain->setting('max_cite_links');
-            $create_url_links = $this->domain->setting('create_url_links');
-            $comment_lines = $this->output_filter->newlinesToArray($post_data['comment']);
-            $line_count = count($comment_lines);
-            $last_i = $line_count - 1;
-            $i = 0;
-
-            for (; $i < $line_count; $i ++)
+            if (NEL_USE_RENDER_CACHE && isset($post_data['render_cache']['comment_data']))
             {
+                $parsed_comment = $post_data['render_cache']['comment_data'];
+            }
+            else
+            {
+                $parsed_comment = $this->parseComment($post_data['comment'], $post_content_id);
+            }
 
-                $line = $comment_lines[$i];
-                $line_break = $i !== $last_i;
+            $comment_data['comment_lines'] = $parsed_comment;
+            $line_count = count($parsed_comment);
 
-                if ($gen_data['index_rendering'] && $line_count > $this->domain->setting('comment_display_lines'))
+            if ($gen_data['index_rendering'])
+            {
+                if ($line_count > $this->domain->setting('comment_display_lines'))
                 {
-                    $comment_data['post_url'] = $web_paths['thread_page'] . '#t' . $post_content_id->threadID() . 'p' .
-                            $post_content_id->postID();
-                    break;
+                    $comment_data['long_comment'] = true;
+                    $comment_data['long_comment_url'] = $web_paths['thread_page'] . '#t' . $post_content_id->threadID() .
+                            'p' . $post_content_id->postID();
+                    $comment_data['comment_lines'] = array();
+                    $i = 0;
+                    $limit = $this->domain->setting('comment_display_lines');
+
+                    for (; $i < $limit; $i ++)
+                    {
+                        $comment_data['comment_lines'][] = $parsed_comment[$i];
+                    }
                 }
-
-                // Split the line on spaces or embedded post cites, preserving the delimiters
-                $segment_chunks = preg_split($line_split_regex, $line, null,
-                        PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-                $line_parts = array();
-                $plaintext_chunk = ''; // Plain text chunks can be recombined, only special cases need be separate
-
-                foreach ($segment_chunks as $chunk)
-                {
-                    $entry = array();
-
-                    if ($cite_total <= $cite_link_max && preg_match($cite_match_regex, $chunk) === 1)
-                    {
-                        $cite_url = $cites->createPostLinkURL($this->domain, $post_content_id, $chunk, true);
-
-                        if (!empty($cite_url))
-                        {
-                            $entry['cite'] = true;
-                            $entry['url'] = $cite_url;
-                            $entry['text'] = $chunk;
-                            ++ $cite_total;
-                        }
-                        else
-                        {
-                            $plaintext_chunk .= $chunk;
-                        }
-                    }
-                    else if ($create_url_links && preg_match($url_split_regex, $chunk) === 1)
-                    {
-                        $entry['link'] = true;
-                        $entry['url'] = $chunk;
-                        $entry['text'] = $chunk;
-                    }
-                    else if (preg_match($greentext_regex, $chunk) === 1)
-                    {
-                        $entry['styled'] = true;
-                        $entry['text'] = $chunk;
-                        $entry['class'] = 'greentext';
-                    }
-                    else
-                    {
-                        $plaintext_chunk .= $chunk;
-                        continue;
-                    }
-
-                    $line_parts[] = array('plain' => true, 'text' => $plaintext_chunk);
-                    $line_parts[] = $entry;
-                    $plaintext_chunk = '';
-                }
-
-                if (!nel_true_empty($plaintext_chunk))
-                {
-                    $line_parts[] = array('plain' => true, 'text' => $plaintext_chunk);
-                }
-
-                $line_parts[] = array('line_break' => $line_break);
-                $comment_data['comment_lines'][]['line_parts'] = $line_parts;
             }
         }
 
@@ -425,5 +362,137 @@ class OutputPost extends Output
         $link['text'] = _gettext('Click here if you are not automatically redirected');
         $output_interstitial = new OutputInterstitial($this->domain, $this->write_mode);
         return $output_interstitial->render($parameters, $data_only, $messages, [$link]);
+    }
+
+    public function generateBacklinks(ContentPost $post): array
+    {
+        $cites = new Cites($this->database);
+        $cite_list = $cites->getForPost($post);
+        $post_content_id = $post->contentID();
+        $backlinks = array();
+
+        foreach ($cite_list['sources'] as $cite)
+        {
+            $backlink_data = array();
+
+            if ($cite['source_board'] == $this->domain->id())
+            {
+                $backlink_data['backlink_text'] = '>>' . $cite['source_post'];
+            }
+            else
+            {
+                $backlink_data['backlink_text'] = '>>>/' . $cite['source_board'] . '/' . $cite['source_post'];
+            }
+
+            $cite_data = $cites->getCiteData($backlink_data['backlink_text'], $this->domain, $post_content_id);
+            $cite_url = '';
+
+            if ($cite_data['exists'])
+            {
+                $cite_url = $cites->createPostLinkURL($cite_data, $this->domain);
+                $cites->addCite($cite_data);
+
+                if (!empty($cite_url))
+                {
+                    $backlink_data['backlink_url'] = $cite_url;
+                    $backlinks[] = $backlink_data;
+                }
+
+                $cites->addCite($cite_data);
+            }
+        }
+
+        return $backlinks;
+    }
+
+    public function parseComment(?string $comment_text, ContentID $post_content_id): array
+    {
+        $comment_data = array();
+
+        if (nel_true_empty($comment_text))
+        {
+            return $comment_data;
+        }
+
+        $greentext_regex = '#^\s*>[^>]#';
+        $url_protocols = $this->domain->setting('url_protocols');
+        $url_split_regex = '#(' . $url_protocols . ')(:\/\/)#';
+        $line_split_regex = '#((?:' . $url_protocols . '):\/\/[^\s]+)|(>>[\d]+)|(>>>\/.+?\/[\d]?+)|(\s)#';
+        $cites = new \Nelliel\Cites($this->database);
+        $create_url_links = $this->domain->setting('create_url_links');
+        $url_link_total = 0;
+        $max_url_links = $this->domain->setting('max_url_links');
+        $comment_lines = $this->output_filter->newlinesToArray($comment_text);
+        $line_count = count($comment_lines);
+        $last_i = $line_count - 1;
+        $i = 0;
+
+        for (; $i < $line_count; $i ++)
+        {
+            $line = $comment_lines[$i];
+            $line_break = $i !== $last_i;
+
+            // Split the line on spaces or embedded post cites, preserving the delimiters
+            // URLs and greentext match until a line split point or line break so they don't need to be in this part
+            $segment_chunks = preg_split($line_split_regex, $line, null, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+            $line_parts = array();
+            $plaintext_chunk = ''; // Plain text chunks can be recombined, only special cases need be separate
+
+            foreach ($segment_chunks as $chunk)
+            {
+                $entry = array();
+                $cite_type = $cites->citeType($chunk);
+
+                if (!empty($cite_type['type']))
+                {
+                    $cite_data = $cites->getCiteData($chunk, $this->domain, $post_content_id);
+                    $cite_url = '';
+
+                    if ($cite_data['exists'])
+                    {
+                        $cite_url = $cites->createPostLinkURL($cite_data, $this->domain);
+                        $cites->addCite($cite_data);
+                    }
+
+                    $entry['cite'] = true;
+                    $entry['valid'] = !empty($cite_url);
+                    $entry['url'] = $cite_url;
+                    $entry['text'] = $chunk;
+                }
+                else if ($create_url_links && $url_link_total < $max_url_links &&
+                        preg_match($url_split_regex, $chunk) === 1)
+                {
+                    $entry['link'] = true;
+                    $entry['url'] = $chunk;
+                    $entry['text'] = $chunk;
+                    $url_link_total ++;
+                }
+                else if (preg_match($greentext_regex, $chunk) === 1)
+                {
+                    $entry['styled'] = true;
+                    $entry['text'] = $chunk;
+                    $entry['class'] = 'greentext';
+                }
+                else
+                {
+                    $plaintext_chunk .= $chunk;
+                    continue;
+                }
+
+                $line_parts[] = array('plain' => true, 'text' => $plaintext_chunk);
+                $line_parts[] = $entry;
+                $plaintext_chunk = '';
+            }
+
+            if (!nel_true_empty($plaintext_chunk))
+            {
+                $line_parts[] = array('plain' => true, 'text' => $plaintext_chunk);
+            }
+
+            $line_parts[] = array('line_break' => $line_break);
+            $comment_data[]['line_parts'] = $line_parts;
+        }
+
+        return $comment_data;
     }
 }

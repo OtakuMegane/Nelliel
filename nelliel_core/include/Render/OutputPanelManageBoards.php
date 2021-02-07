@@ -12,7 +12,6 @@ use PDO;
 
 class OutputPanelManageBoards extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -21,9 +20,8 @@ class OutputPanelManageBoards extends Output
 
     public function main(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/manage_boards');
         $parameters['is_panel'] = true;
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Manage Boards');
@@ -43,8 +41,8 @@ class OutputPanelManageBoards extends Output
             $board_data = array();
             $board_data['bgclass'] = $bgclass;
             $bgclass = ($bgclass === 'row1') ? 'row2' : 'row1';
-            $board_data['board_id'] = $board_info['board_id'];
-            $board_data['board_uri'] = $board_info['board_uri'];
+            $board_data['board_uri'] = $board_info['board_id'];
+            $board_data['board_url'] = NEL_BASE_WEB_PATH . $board_info['board_id'] . '/';
             $board_data['db_prefix'] = $board_info['db_prefix'];
 
             if ($board_info['locked'] == 0)
@@ -52,7 +50,7 @@ class OutputPanelManageBoards extends Output
                 $board_data['lock_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'admin', 'section' => 'manage-boards',
-                                    'board_id' => $board_info['board_id'], 'actions' => 'lock']);
+                                    'board-id' => $board_info['board_id'], 'actions' => 'lock']);
                 $board_data['status'] = _gettext('Active');
                 $board_data['lock_text'] = _gettext('Lock Board');
             }
@@ -61,14 +59,14 @@ class OutputPanelManageBoards extends Output
                 $board_data['lock_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                         http_build_query(
                                 ['module' => 'admin', 'section' => 'manage-boards',
-                                    'board_id' => $board_info['board_id'], 'actions' => 'unlock']);
+                                    'board-id' => $board_info['board_id'], 'actions' => 'unlock']);
                 $board_data['status'] = _gettext('Locked');
                 $board_data['lock_text'] = _gettext('Unlock Board');
             }
 
             $board_data['remove_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                     http_build_query(
-                            ['module' => 'admin', 'section' => 'manage-boards', 'board_id' => $board_info['board_id'],
+                            ['module' => 'admin', 'section' => 'manage-boards', 'board-id' => $board_info['board_id'],
                                 'actions' => 'remove']);
             $this->render_data['board_list'][] = $board_data;
         }
@@ -86,7 +84,7 @@ class OutputPanelManageBoards extends Output
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Manage Boards');
         $parameters['section'] = $parameters['section'] ?? _gettext('Remove');
         $parameters['is_manage'] = true;
-        $board_id = $_GET['board_id'];
+        $board_id = $_GET['board-id'];
         $messages[] = sprintf(_gettext('You are about to delete the board: %s'), $board_id);
         $messages[] = _gettext(
                 'This will wipe out all posts, settings, files, everything. There is no undo or recovery.');
@@ -98,7 +96,7 @@ class OutputPanelManageBoards extends Output
         $link2['url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                 http_build_query(
                         ['module' => 'admin', 'section' => 'manage-boards', 'actions' => 'remove',
-                            'action-confirmed' => 'true', 'board_id' => $board_id]);
+                            'action-confirmed' => 'true', 'board-id' => $board_id]);
         $parameters['extra_url_break'] = true;
         $output_interstitial = new OutputInterstitial($this->domain, $this->write_mode);
         echo $output_interstitial->render($parameters, $data_only, $messages, [$link, $link2]);

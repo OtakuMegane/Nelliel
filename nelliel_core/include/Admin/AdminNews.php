@@ -8,14 +8,15 @@ if (!defined('NELLIEL_VERSION'))
 }
 
 use Nelliel\Domains\Domain;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 
 class AdminNews extends Admin
 {
 
-    function __construct(Authorization $authorization, Domain $domain, array $inputs)
+    function __construct(Authorization $authorization, Domain $domain, Session $session, array $inputs)
     {
-        parent::__construct($authorization, $domain, $inputs);
+        parent::__construct($authorization, $domain, $session, $inputs);
     }
 
     public function renderPanel()
@@ -27,15 +28,12 @@ class AdminNews extends Admin
 
     public function creator()
     {
+        $this->verifyAccess();
     }
 
     public function add()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_news'))
-        {
-            nel_derp(471, _gettext('You are not allowed to make news posts.'));
-        }
-
+        $this->verifyAction();
         $news_info = array();
         $news_info['poster_id'] = $this->session_user->id();
         $news_info['headline'] = $_POST['headline'] ?? null;
@@ -51,24 +49,37 @@ class AdminNews extends Admin
 
     public function editor()
     {
+        $this->verifyAccess();
     }
 
     public function update()
     {
+        $this->verifyAction();
     }
 
     public function remove()
     {
-        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_news'))
-        {
-            nel_derp(472, _gettext('You are not allowed to remove news posts.'));
-        }
-
+        $this->verifyAction();
         $entry = $_GET['entry'];
         $prepared = $this->database->prepare('DELETE FROM "' . NEL_NEWS_TABLE . '" WHERE "entry" = ?');
         $this->database->executePrepared($prepared, [$entry]);
         $this->regenNews();
         $this->outputMain(true);
+    }
+
+    public function enable()
+    {
+        $this->verifyAction();
+    }
+
+    public function disable()
+    {
+        $this->verifyAction();
+    }
+
+    public function makeDefault()
+    {
+        $this->verifyAction();
     }
 
     private function regenNews()
@@ -77,11 +88,19 @@ class AdminNews extends Admin
         $regen->news($this->domain);
     }
 
-    private function verifyAccess()
+    public function verifyAccess()
     {
         if (!$this->session_user->checkPermission($this->domain, 'perm_manage_news'))
         {
-            nel_derp(470, _gettext('You are not allowed to access the news panel.'));
+            nel_derp(440, _gettext('You do not have access to the News panel.'));
+        }
+    }
+
+    public function verifyAction()
+    {
+        if (!$this->session_user->checkPermission($this->domain, 'perm_manage_news'))
+        {
+            nel_derp(441, _gettext('You are not allowed to manage news articles.'));
         }
     }
 }

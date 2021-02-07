@@ -7,6 +7,8 @@ if (!defined('NELLIEL_VERSION'))
     die("NOPE.AVI");
 }
 
+use Nelliel\Redirect;
+use Nelliel\Account\Session;
 use Nelliel\Auth\Authorization;
 use Nelliel\Domains\Domain;
 
@@ -14,11 +16,15 @@ class Dispatch
 {
     private $domain;
     private $authorization;
+    private $session;
 
-    function __construct(Domain $domain, Authorization $authorization)
+    function __construct(Domain $domain, Authorization $authorization, Session $session)
     {
         $this->domain = $domain;
         $this->authorization = $authorization;
+        $this->session = $session;
+        $this->session->init(true);
+        $this->session->loggedInOrError();
     }
 
     public function dispatch(array $inputs)
@@ -36,6 +42,9 @@ class Dispatch
                 $admin_handler = $this->sections($inputs, $action);
             }
         }
+
+        $redirect = new Redirect();
+        $redirect->changeDelay(0);
 
         if (is_null($admin_handler))
         {
@@ -56,64 +65,47 @@ class Dispatch
         switch ($inputs['section'])
         {
             case 'bans':
-                $admin_handler = new AdminBans($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminBans($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'board-settings':
-                $admin_handler = new AdminBoardSettings($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminBoardSettings($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'board-defaults':
-                $admin_handler = new AdminBoardSettings($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminBoardSettings($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'file-filters':
-                $admin_handler = new AdminFileFilters($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminFileFilters($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'filetypes':
-                $admin_handler = new AdminFiletypes($this->authorization, $this->domain, $inputs);
-
-                if ($action === 'enable')
-                {
-                    $admin_handler->enable();
-                }
-                else if ($action === 'disable')
-                {
-                    $admin_handler->disable();
-                }
-                else
-                {
-                    $this->standard($admin_handler, $action);
-                }
-
+                $admin_handler = new AdminFiletypes($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
                 break;
 
             case 'icon-sets':
-                $admin_handler = new AdminIconSets($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminIconSets($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
+                break;
 
-                if ($action === 'make-default')
-                {
-                    $admin_handler->makeDefault();
-                }
-                else
-                {
-                    $this->standard($admin_handler, $action);
-                }
-
+            case 'ifthens':
+                $admin_handler = new AdminIfThens($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
                 break;
 
             case 'logs':
-                $admin_handler = new AdminLogs($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminLogs($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'manage-boards':
-                $admin_handler = new AdminBoards($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminBoards($this->authorization, $this->domain, $this->session, $inputs);
 
                 if ($action === 'remove')
                 {
@@ -142,60 +134,42 @@ class Dispatch
                 break;
 
             case 'news':
-                $admin_handler = new AdminNews($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminNews($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'permissions':
-                $admin_handler = new AdminPermissions($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminPermissions($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'reports':
-                $admin_handler = new AdminReports($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminReports($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'roles':
-                $admin_handler = new AdminRoles($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminRoles($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'site-settings':
-                $admin_handler = new AdminSiteSettings($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminSiteSettings($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'styles':
-                $admin_handler = new AdminStyles($this->authorization, $this->domain, $inputs);
-
-                if ($action === 'make-default')
-                {
-                    $admin_handler->makeDefault();
-                }
-                else
-                {
-                    $this->standard($admin_handler, $action);
-                }
-
+                $admin_handler = new AdminStyles($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
                 break;
 
             case 'templates':
-                $admin_handler = new AdminTemplates($this->authorization, $this->domain, $inputs);
-
-                if ($action === 'make-default')
-                {
-                    $admin_handler->makeDefault();
-                }
-                else
-                {
-                    $this->standard($admin_handler, $action);
-                }
-
+                $admin_handler = new AdminTemplates($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
                 break;
 
             case 'threads':
-                $admin_handler = new AdminThreads($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminThreads($this->authorization, $this->domain, $this->session, $inputs);
 
                 // TODO: Refine this whenever we get threads panel updated
                 if ($inputs['subsection'] === 'panel')
@@ -211,17 +185,9 @@ class Dispatch
                 {
                     $admin_handler->sticky();
                 }
-                else if ($action === 'unsticky')
-                {
-                    $admin_handler->unsticky();
-                }
                 else if ($action === 'lock')
                 {
                     $admin_handler->lock();
-                }
-                else if ($action === 'unlock')
-                {
-                    $admin_handler->unlock();
                 }
                 else if ($action === 'delete')
                 {
@@ -229,12 +195,21 @@ class Dispatch
                 }
                 else if ($action === 'ban')
                 {
-                    $admin_handler = new \Nelliel\Admin\AdminBans($this->authorization, $this->domain, $inputs);
+                    $admin_handler = new \Nelliel\Admin\AdminBans($this->authorization, $this->domain, $this->session,
+                            $inputs);
                     $admin_handler->creator();
                 }
                 else if ($action === 'bandelete')
                 {
                     $admin_handler->banDelete();
+                }
+                else if ($action === 'sage')
+                {
+                    $admin_handler->permasage();
+                }
+                else if ($action === 'cyclic')
+                {
+                    $admin_handler->cyclic();
                 }
                 else if ($action === 'expand')
                 {
@@ -248,22 +223,24 @@ class Dispatch
                 break;
 
             case 'users':
-                $admin_handler = new AdminUsers($this->authorization, $this->domain, $inputs);
+                $admin_handler = new AdminUsers($this->authorization, $this->domain, $this->session, $inputs);
                 $this->standard($admin_handler, $action);
                 break;
 
             case 'site-main-panel':
-                $session = new \Nelliel\Account\Session();
-                $session->loggedInOrError();
                 $output_main_panel = new \Nelliel\Render\OutputPanelMain($this->domain, false);
                 $output_main_panel->render([], false);
                 break;
 
             case 'board-main-panel':
-                $session = new \Nelliel\Account\Session();
-                $session->loggedInOrError();
                 $output_board_panel = new \Nelliel\Render\OutputPanelBoard($this->domain, false);
                 $output_board_panel->render(['board_id' => $board_id], false);
+                break;
+
+            case 'staff-board':
+                $admin_handler = new AdminStaffBoard($this->authorization, $this->domain, $this->session, $inputs);
+                $this->standard($admin_handler, $action);
+                break;
         }
 
         return $admin_handler;
@@ -291,6 +268,18 @@ class Dispatch
 
             case 'remove':
                 $admin_handler->remove();
+                break;
+
+            case 'enable':
+                $admin_handler->enable();
+                break;
+
+            case 'disable':
+                $admin_handler->disable();
+                break;
+
+            case 'make-default':
+                $admin_handler->makeDefault();
                 break;
         }
     }

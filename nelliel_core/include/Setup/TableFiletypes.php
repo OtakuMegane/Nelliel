@@ -25,7 +25,7 @@ class TableFiletypes extends Table
             'mime' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false],
             'sub_extensions' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false],
             'id_regex' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false],
-            'label' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false],
+            'type_label' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false],
             'type_def' => ['pdo_type' => PDO::PARAM_INT, 'row_check' => true, 'auto_inc' => false],
             'enabled' => ['pdo_type' => PDO::PARAM_INT, 'row_check' => false, 'auto_inc' => false],
             'moar' => ['pdo_type' => PDO::PARAM_STR, 'row_check' => false, 'auto_inc' => false]];
@@ -45,13 +45,17 @@ class TableFiletypes extends Table
             mime            VARCHAR(255) DEFAULT NULL,
             sub_extensions  TEXT DEFAULT NULL,
             id_regex        TEXT DEFAULT NULL,
-            label           VARCHAR(255) DEFAULT NULL,
+            type_label      VARCHAR(255) DEFAULT NULL,
             type_def        SMALLINT NOT NULL DEFAULT 0,
             enabled         SMALLINT NOT NULL DEFAULT 0,
             moar            TEXT DEFAULT NULL
         ) " . $options . ";";
 
         return $schema;
+    }
+
+    public function postCreate(array $other_tables = null)
+    {
     }
 
     public function insertDefaults()
@@ -95,7 +99,7 @@ class TableFiletypes extends Table
         $this->insertDefaultRow(['', 'video', null, null, null, null, 'Video files', 1, 1]);
         $this->insertDefaultRow(['mpg', 'video', 'mpeg', 'video/mpeg', '["mpeg","mpe"]', '^\x00\x00\x01[\xB0-\xBF]', 'MPEG-1/MPEG-2', 0, 1]);
         $this->insertDefaultRow(['mov', 'video', 'quicktime', 'video/quicktime', '[]', '^.{4}(?:cmov|free|ftypqt|mdat|moov|pnot|skip|wide)', 'Quicktime Movie', 0, 1]);
-        $this->insertDefaultRow(['avi', 'video', 'avi', 'video/x-msvideo', '[]', '^RIFF.{4}AVI\sx20LIST', 'AVI', 0, 1]);
+        $this->insertDefaultRow(['avi', 'video', 'avi', 'video/x-msvideo', '[]', '^RIFF.{4}AVI\x20LIST', 'AVI', 0, 1]);
         $this->insertDefaultRow(['wmv', 'video', 'wmv', 'video/x-ms-wmv', '[]', '^\x30\x26\xB2\x75\x8E\x66\xCF\x11\xA6\xD9\x00\xAA\x00\x62\xCE\x6C', 'Windows Media Video', 0, 1]);
         $this->insertDefaultRow(['mp4', 'video', 'mpeg4', 'video/mp4', '[]', '^.{4}ftyp(?:iso2|isom|mp41|mp42)', 'MPEG-4 Media', 0, 1]);
         $this->insertDefaultRow(['m4v', 'video', 'm4v', 'video/x-m4v', '[]', '^.{4}ftypmp(?:41|42|71)', 'MPEG-4 Video', 0, 1]);

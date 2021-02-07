@@ -24,15 +24,13 @@ class JSONThread extends JSONOutput
     {
         $thread_array = array();
         $thread_array['thread_id'] = nel_cast_to_datatype($data['thread_id'], 'integer');
-        $thread_array['first_post'] = nel_cast_to_datatype($data['first_post'], 'integer');
-        $thread_array['last_post'] = nel_cast_to_datatype($data['last_post'], 'integer');
         $thread_array['last_bump_time'] = nel_cast_to_datatype($data['last_bump_time'], 'integer');
         $thread_array['last_bump_time_milli'] = nel_cast_to_datatype($data['last_bump_time_milli'], 'integer');
         $thread_array['last_update'] = nel_cast_to_datatype($data['last_update'], 'integer');
         $thread_array['last_update_milli'] = nel_cast_to_datatype($data['last_update_milli'], 'integer');
         $thread_array['post_count'] = nel_cast_to_datatype($data['post_count'], 'integer');
         $thread_array['content_count'] = nel_cast_to_datatype($data['content_count'], 'integer');
-        $thread_array['thread_sage'] = nel_cast_to_datatype($data['thread_sage'], 'boolean');
+        $thread_array['permasage'] = nel_cast_to_datatype($data['permasage'], 'boolean');
         $thread_array['sticky'] = nel_cast_to_datatype($data['sticky'], 'boolean');
         $thread_array['locked'] = nel_cast_to_datatype($data['locked'], 'boolean');
         $thread_array = nel_plugins()->processHook('nel-json-prepare-thread', [$data], $thread_array);

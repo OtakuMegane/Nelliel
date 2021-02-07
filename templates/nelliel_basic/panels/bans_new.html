@@ -1,35 +1,13 @@
 <form accept-charset="utf-8" action="{{ form_action }}" method="post" enctype="multipart/form-data">
 	<div class="display-table">
-		{{# content_ban }}
-		{{^ unhashed_ip }}
-		<div class="display-row">
-			<input id="ban_hashed_ip" type="hidden" name="ban_hashed_ip" value="{{ ban_hashed_ip }}">
-			<span class="display-cell">
-				<span data-i18n="gettext">IP hash to ban:</span>
-				<span>{{ ban_hashed_ip }}</span>
-			</span>
-		</div>
-		{{/ unhashed_ip }}
-		{{# unhashed_ip }}
-		<div class="display-row">
-			<input id="ban_ip" type="hidden" name="ban_ip" value="{{ ban_ip }}">
-			<span class="display-cell">
-				<span data-i18n="gettext">IP to ban:</span>
-				<span>{{ ban_ip }}</span>
-			</span>
-		</div>
-		{{/ unhashed_ip }}
-		{{/ content_ban }}
-		{{^ content_ban }}
 		<div class="display-row">
 			<span class="display-cell">
-				<label for="ban_ip" data-i18n="gettext">Enter a single IP address or a range.</label>
+				<label for="ban_ip" data-i18n="gettext">Enter an IP address, hash or range:</label>
 			</span>
 			<span class="display-cell">
 				<input id="ban_ip" type="text" name="ban_ip" value="{{ ban_ip }}">
 			</span>
 		</div>
-		{{/ content_ban }}
 		<div class="display-row">
 			<span class="display-cell">
 				<label for="ban_board" data-i18n="gettext">Apply ban to this board:</label>
@@ -81,14 +59,6 @@
 			</span>
 		</div>
 		{{/ is_post_ban }}
-		<div class="display-row">
-			<span class="display-cell">
-				<label for="ban_type" data-i18n="gettext">Ban type:</label>
-			</span>
-			<span class="display-cell">
-				<input id="ban_type" type="text" name="ban_type" value="{{ ban_type }}">
-			</span>
-		</div>
 		<div class="display-row">
 			<span class="display-cell">
 				<input type="submit" value="Add Ban" data-i18n-attributes="gettext|value">

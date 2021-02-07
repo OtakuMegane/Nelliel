@@ -12,7 +12,6 @@ use PDO;
 
 class OutputPanelFiletypes extends Output
 {
-    protected $render_data = array();
 
     function __construct(Domain $domain, bool $write_mode)
     {
@@ -21,9 +20,8 @@ class OutputPanelFiletypes extends Output
 
     public function main(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
+        $this->setupTimer();
         $this->setBodyTemplate('panels/filetypes_main');
         $parameters['is_panel'] = true;
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Filetypes');
@@ -63,7 +61,7 @@ class OutputPanelFiletypes extends Output
             $filetype_data['sub_extensions'] = substr($sub_extensions, 0, -1);
             $filetype_data['mime'] = $filetype['mime'];
             $filetype_data['id_regex'] = $filetype['id_regex'];
-            $filetype_data['label'] = $filetype['label'];
+            $filetype_data['type_label'] = $filetype['type_label'];
             $filetype_data['edit_url'] = NEL_MAIN_SCRIPT_QUERY_WEB_PATH .
                     http_build_query(
                             ['module' => 'admin', 'section' => 'filetypes', 'actions' => 'edit',
@@ -109,9 +107,7 @@ class OutputPanelFiletypes extends Output
 
     public function edit(array $parameters, bool $data_only)
     {
-        $this->render_data = array();
-        $this->setupTimer($this->domain, $this->render_data);
-        $this->render_data['page_language'] = $this->domain->locale();
+        $this->renderSetup();
         $this->setBodyTemplate('panels/filetypes_edit');
         $parameters['panel'] = $parameters['panel'] ?? _gettext('Filetypes');
         $parameters['section'] = $parameters['section'] ?? _gettext('Edit');
@@ -150,7 +146,7 @@ class OutputPanelFiletypes extends Output
 
                 $this->render_data['sub_extensions'] = substr($sub_extensions, 0, -1);
                 $this->render_data['id_regex'] = $filetype_data['id_regex'];
-                $this->render_data['label'] = $filetype_data['label'];
+                $this->render_data['type_label'] = $filetype_data['type_label'];
                 $this->render_data['enabled_checked'] = $filetype_data['enabled'] == 1 ? 'checked' : '';
             }
         }
